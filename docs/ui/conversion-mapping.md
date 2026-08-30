@@ -47,6 +47,7 @@ one.
 | Report | Four fixed sections | Done / Waiting / Blocked / Due next, always in that order. |
 | Context | `ContextChip` — dot + name | Repeated on nearly every row; a filled pill would read as an alert. |
 | Reliability | `ReliabilityBadge` + `DegradedSourceNotice` | `accounts.reliability` surfaced wherever derived data is shown. |
+| Connector identity | Vendor marks in `source-marks.tsx` | Settings → Connections only. Picking an account is the one place a logo carries information. |
 | Autonomy level | `AutonomyBadge` + `Progress` | Evidence is the argument for a level, so it sits beside it. |
 | Navigation | `Sidebar` + `Command` (⌘K) | Long sittings; changing context should not need the mouse. |
 | Outbound / destructive | `AlertDialog` | Never `Dialog`. Approving sends real mail to a real client. |
@@ -61,8 +62,6 @@ see §3.1.
 |---|---|---|
 | `TextAnimate` | Report heading | Marks the session as closed; this is the summary of it. |
 | `BlurFade` | Report sections, empty states | Four sections settling in reading order; a list that rendered rather than failed. |
-| `AnimatedBeam` | Login — ingest figure | Six sources converging on one frame. The figure *is* the architecture of §5. |
-| `DotPattern` | Login — panel texture | Static, no glow. Surface, not motion. |
 | `KineticText` | Login — logotype | Hover-only letter weighting. An affordance, not an animation. |
 
 Cut after being built and looked at, each for the same reason — **motion must never gate
@@ -72,7 +71,8 @@ content, and decoration must never sit on a surface read daily**:
 |---|---|---|
 | `NumberTicker` | Dashboard stat cards, header token count | A ticker mid-animation, or one whose observer never fires, shows a confident `0`. These four numbers are the first thing read each morning. |
 | `AnimatedList` | Incoming signals | Reveals one item per tick; the panel is empty on arrival and stays partial for seconds. |
-| `Meteors` | Login — right panel | Falling specks behind a password field. It said nothing, and it made the screen look less serious rather than more. |
+| `Meteors` | Login — right panel | Falling specks behind a password field. It said nothing, and made the screen look less serious rather than more. |
+| `AnimatedBeam`, `DotPattern` | Login — ingest figure | Six vendor logos on animated beams is the stock connect-your-apps diagram, and it was selling integrations to the one person who already owns the system. Six vendors also meant six visual languages in six circles — the thing that made the screen read as generic. |
 
 The motion that stayed runs on mount rather than on intersection, so no content depends on
 an `IntersectionObserver` firing.
@@ -86,26 +86,31 @@ unchanged for all of them — dashboard, work items, schedule, audit log, report
 `/login` sits outside that set: seconds of attention, no operational data, no decision made
 from it.
 
-Even there the decoration is load-bearing. The panel is the app's own dark tokens (the
-`dark` class redefines the custom properties on that element, so nothing is hard-coded),
-and the figure on it names every source Warp ingests from — and by omission, the ones it
-never will. There is no photograph: a stock image is the least specific thing this screen
-could say.
+Even there, the decoration is the product rather than an effect on top of it. The left
+panel is a field of warp threads — the metaphor the product is named for (context doc §12),
+where the warp is the set of lengthwise threads held under tension and every other thread
+is woven into it. Seven of the threads are lit in the context kind colours, grouped the way
+the contexts actually nest: three work threads together, one study thread, then a family of
+three personal ones. It says *several parallel lives held in one frame* without a logo, an
+arrow, or a sentence of explanation, and **nothing about it moves**.
 
-The panel is three zones and nothing else — logotype, figure, one line. An earlier pass had
-seven stacked blocks with the figure in a bordered card, which read as a document with a
-widget dropped into it. The figure now bleeds past the panel padding instead of sitting in
-a box drawn on top of it.
+It replaced an integration diagram that was cut for the reasons in the table above. The
+brand marks built for that diagram were not thrown away — they moved to Settings →
+Connections, which is the one screen where a vendor logo is the right call: the owner is
+picking a real account at a real company, and a mail envelope does not distinguish Gmail
+from anything else.
 
-Two Magic UI components were edited on the way in, each noted in its own file and each
-revertible by re-running the CLI:
+The panel carries the app's dark tokens whatever the viewer's theme — the `dark` class
+redefines the custom properties on that element, so `--border` and `--context-work` inside
+it are the dark ones and nothing is hard-coded.
 
-- `dot-pattern` — `Math.random()` during render (the React Compiler lint rejects it as
-  impure, and it re-seeds on every render) replaced with integer mixing off the dot index.
-- `meteors` — deleted with its keyframes after the trial above.
+There is no photograph. A stock image is the least specific thing this screen could say.
 
-`animated-beam` is used as shipped, with colours passed as `var(--border)`,
-`var(--muted-foreground)`, and `var(--context-work)` so the figure themes with the app.
+One Magic UI component was edited on the way in and will be reverted by re-running the
+CLI — reapply it: `dot-pattern` had `Math.random()` during render, which the React
+Compiler lint rejects as impure. It has since been deleted along with the diagram, but
+`warp-threads` uses the same integer-mixing seed for its thread jitter, for the same
+reason: the weave has to be identical on the server and the client.
 
 ## 4. Invariants the interface has to hold
 

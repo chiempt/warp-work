@@ -28,19 +28,25 @@ Three existing tables look like they might already answer this. None does:
 
 ## Decision
 
-Two new tables, prefixed `auth_` so they are never confused with the three above.
+`users` is split in two. The root keeps only `id` and its timestamps — around a hundred foreign keys
+point at that row, so it holds nothing that could ever need rewriting. `user_profiles` holds
+everything describing the person, keyed by `user_id` so exactly one profile per user is structural
+rather than remembered.
 
-**`auth_identities`** — one row per way in: `(provider, subject)`, unique. A table rather than
+Then two new tables, prefixed `auth_` so they are never confused with the three above.
+
+**`auth_providers`** — plural by force as well as by convention, since the singular name belongs to
+the enum and a table cannot share a name with a type. One row per way in: `(kind, subject)`, unique. A table rather than
 columns on `users`, because a single way in is a single point of lockout: lose the Google account
 and there is no administrator to appeal to. A `BEFORE DELETE` trigger refuses to remove the last
 one.
 
 `subject` is the provider's immutable identifier — Google's `sub`, a passkey's credential id —
 **never the email**. An email can be reassigned at the provider, and matching on it would hand the
-account to whoever inherits the address. `auth_identities.email` records what the provider reported
-and is display-only; `users.email` stays canonical.
+account to whoever inherits the address. `auth_providers.email` records what the provider reported
+and is display-only; `user_profiles.email` stays canonical.
 
-The `auth_provider` enum ships as `google | zalo | facebook | passkey`, though only `google` is
+The `auth_provider_kind` enum ships as `google | zalo | facebook | passkey`, though only `google` is
 implemented first. Values are cheap now and awkward later: extending a Postgres enum needs
 `ALTER TYPE ... ADD VALUE` in its own no-transaction migration.
 

@@ -1,4 +1,11 @@
+-- Contacts, and the handles they are reachable at.
+--
+-- `people` are counterparties — the owner is deliberately not among them, or the
+-- system could record that they owe themselves.
+
 -- +goose Up
+
+CREATE TYPE identity_provider AS ENUM ('email', 'phone', 'zalo', 'facebook', 'instagram', 'other');
 
 CREATE TABLE people (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -12,6 +19,7 @@ CREATE TABLE people (
 );
 
 CREATE INDEX people_user_idx ON people (user_id);
+
 CREATE INDEX people_name_trgm_idx ON people USING gin (display_name gin_trgm_ops);
 
 CREATE TRIGGER people_set_updated_at
@@ -40,3 +48,4 @@ CREATE INDEX identities_person_idx ON identities (person_id);
 
 DROP TABLE IF EXISTS identities;
 DROP TABLE IF EXISTS people;
+DROP TYPE IF EXISTS identity_provider;

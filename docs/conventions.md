@@ -97,15 +97,15 @@ a `signal` is called a signal — in Go, in SQL, in TSX, and in the interface.
 - JSON columns are `jsonb`. Raw external payloads go into `signals.payload` untouched — no
   normalisation, no key filtering, no re-serialisation.
 - Every table has `created_at`. Mutable tables also have `updated_at`.
-- Enum-like columns are **native Postgres `ENUM` types**, declared together in
-  `db/migrations/00002_enums.sql`. Adding a value later is `ALTER TYPE ... ADD VALUE`, which cannot
+- Enum-like columns are **native Postgres `ENUM` types**, declared in the migration of the module
+  that owns them. Adding a value later is `ALTER TYPE ... ADD VALUE`, which cannot
   run inside a transaction and cannot use the new value in the same one — so it needs its own
   migration marked `-- +goose NO TRANSACTION`. A value can never be removed. Add plausible values up
   front; they are cheap now and awkward later.
 - Deletes are soft where history matters (`is_archived`, `status = 'dropped'`). `signals`,
   `executions`, and `audit_log` are never deleted by application code.
 - A rule whose violation cannot be undone belongs in the database, not in the application: signals
-  are immutable, and the last `auth_identities` row cannot be deleted. Both are triggers, because
+  are immutable, and the last `auth_providers` row cannot be deleted. Both are triggers, because
   "every code path remembers" is not a guarantee.
 - Index every foreign key, and every column in a routing or session-scoped query —
   `signal_contexts (context_id, signal_id)` and `commitments (context_id, status, due_at)` first.
@@ -114,9 +114,20 @@ a `signal` is called a signal — in Go, in SQL, in TSX, and in the interface.
 
 ### Migrations
 
+- **One module per migration.** A migration creates the tables, enums, indexes, triggers and views
+  of exactly one part of the domain, and is named after it — `00006_accounts.sql`, not
+  `00004_sources.sql` holding accounts, routing and signals at once. Numbering is dependency order:
+  a module's foreign keys point only at modules above it.
+- Declare an enum in the module that owns it, not in a shared enum file. Where two modules need the
+  same type, it belongs to whichever defines the concept — `autonomy_level` sits with `action_types`
+  because `runs` needs it before the autonomy rules exist.
 - goose, forward-only in practice. Never edit an applied migration; write a new one.
 - Every migration has a `-- +goose Down` that works, or a comment at the top stating why a rollback
-  is impossible and what recovery would require.
+  is impossible and what recovery would require. Drops go by object kind, not by reverse creation
+  order: every table before any function, because a trigger depends on its function. Verify with a
+  full `down` to zero followed by `up`, then diff the schema.
+- A migration must only do what the migration role can do. Extensions are provisioned by a superuser
+  in `make db-create`, so no migration drops one.
 - Data backfills are separate from schema changes, in their own migration, and idempotent.
 - After any migration touching a queried table, regenerate sqlc in the same commit.
 

@@ -154,7 +154,19 @@ Postgres 17 with the `pgvector` extension. All timestamps stored in UTC; convert
 ### 6.1 Foundation
 
 **`users`**
+The identity root, and nothing else: `id`, `created_at`, `updated_at`. Around a hundred foreign
+keys point at this row, so it holds nothing that could ever need rewriting.
+
 Single row in practice. Present so multi-user is not a rewrite.
+
+**`user_profiles`**
+`user_id` (primary key, so exactly one per user), `email` (citext, unique), `display_name`,
+`timezone`, `created_at`, `updated_at`.
+
+Everything describing the person, separated from the identity they are anchored by. `email` here is
+the canonical address the owner declares — it is *not* what authenticates them: sign-in matches on
+`auth_providers.subject`, precisely so that changing this address cannot hand the account to
+whoever inherits it.
 
 **`contexts`**
 `id`, `user_id`, `parent_id` (self-referencing, nullable), `name`, `kind`
@@ -289,7 +301,8 @@ stating plainly:
 
 | Table | Answers |
 |---|---|
-| `auth_identities` | how the **owner** signs in |
+| `users` + `user_profiles` | who the **owner** is — identity root, then everything describing them |
+| `auth_providers` | how the **owner** signs in |
 | `accounts` | where **signals** come from, and how to keep reading them |
 | `identities` | which handles a **contact** is reachable at |
 
@@ -299,9 +312,12 @@ disconnecting Gmail locks the owner out. `identities` cannot either: it hangs of
 `people` are the counterparties in `commitments` — putting the owner there would let the system
 record that they owe themselves something.
 
-**`auth_identities`**
-`id`, `user_id`, `provider` (`google` | `zalo` | `facebook` | `passkey`), `subject`, `email`,
-`is_primary`, `linked_at`, `last_login_at`. Unique on `(provider, subject)`.
+**`auth_providers`**
+`id`, `user_id`, `kind` (`google` | `zalo` | `facebook` | `passkey`), `subject`, `email`,
+`is_primary`, `linked_at`, `last_login_at`. Unique on `(kind, subject)`.
+
+Plural by force as well as by convention: the singular name is taken by the enum, and a table and a
+type cannot share one.
 
 One row per way in. A table rather than columns on `users` because a single way in is a single
 point of lockout: lose the Google account and there is no administrator to appeal to. A second
@@ -309,14 +325,14 @@ row is the recovery path, and a trigger refuses to delete the last one.
 
 `subject` is the provider's immutable identifier — Google's `sub` claim, a passkey's credential
 id — never the email. An email can be changed at the provider, and matching on it would hand the
-account to whoever inherits the address. `auth_identities.email` is what the provider reported and
+account to whoever inherits the address. `auth_providers.email` is what the provider reported and
 is display-only; `users.email` stays canonical.
 
 Zalo Login and Facebook Login are products distinct from their messaging APIs. Signing in with
 Zalo does not make Zalo personal messages readable — see §4.
 
 **`auth_sessions`**
-`id`, `user_id`, `identity_id`, `token_hash`, `issued_at`, `last_seen_at`, `expires_at`,
+`id`, `user_id`, `auth_provider_id`, `token_hash`, `issued_at`, `last_seen_at`, `expires_at`,
 `revoked_at`, `user_agent`, `ip`.
 
 Server-side and revocable. A stateless token cannot be withdrawn: a lost laptop would mean waiting

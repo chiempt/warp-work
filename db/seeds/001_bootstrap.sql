@@ -4,14 +4,21 @@
 
 BEGIN;
 
-INSERT INTO users (id, email, display_name, timezone)
+-- The identity root and its profile are created together: user_id is the
+-- profile's primary key, so a user without one would be a user nothing can
+-- display.
+INSERT INTO users (id)
+VALUES ('00000000-0000-0000-0000-000000000001')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO user_profiles (user_id, email, display_name, timezone)
 VALUES (
     '00000000-0000-0000-0000-000000000001',
     'owner@example.com',
     'Owner',
     'Asia/Ho_Chi_Minh'
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (user_id) DO NOTHING;
 
 -- Contexts -----------------------------------------------------------------
 

@@ -38,7 +38,7 @@ export function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-sm space-y-6">
+    <div className="w-full max-w-[22rem] space-y-7">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
         <p className="text-sm text-muted-foreground">
@@ -46,7 +46,7 @@ export function LoginForm() {
         </p>
       </header>
 
-      <form onSubmit={onSubmit} className="space-y-4" noValidate>
+      <form onSubmit={onSubmit} className="space-y-5" noValidate>
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
           <Input
@@ -54,6 +54,7 @@ export function LoginForm() {
             type="email"
             autoComplete="username"
             placeholder="you@example.com"
+            className="h-10"
             value={email}
             onChange={(e) => {
               setEmail(e.target.value)
@@ -70,6 +71,7 @@ export function LoginForm() {
             type="password"
             autoComplete="current-password"
             placeholder="••••••••••••"
+            className="h-10"
             value={passphrase}
             onChange={(e) => {
               setPassphrase(e.target.value)
@@ -93,7 +95,7 @@ export function LoginForm() {
         <Button
           type="submit"
           size="lg"
-          className="w-full"
+          className="h-10 w-full"
           disabled={state === "submitting"}
         >
           {state === "submitting" ? (

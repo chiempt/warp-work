@@ -1,17 +1,10 @@
+-- The organising axis: the life-area tree.
+--
+-- Every signal, task, person, memory note and autonomy rule belongs to a context.
+
 -- +goose Up
 
-CREATE TABLE users (
-    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    email        citext      NOT NULL UNIQUE,
-    display_name text        NOT NULL,
-    timezone     text        NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
-    created_at   timestamptz NOT NULL DEFAULT now(),
-    updated_at   timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TRIGGER users_set_updated_at
-    BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TYPE context_kind AS ENUM ('work', 'study', 'personal');
 
 -- The organising axis of the whole system. Self-referencing tree, max depth 8.
 CREATE TABLE contexts (
@@ -37,6 +30,7 @@ CREATE TABLE contexts (
 
 CREATE INDEX contexts_user_active_idx ON contexts (user_id, position)
     WHERE is_archived = false;
+
 CREATE INDEX contexts_parent_idx ON contexts (parent_id);
 
 -- A cycle in the tree would make every recursive query hang. Block it at write time.
@@ -77,8 +71,37 @@ CREATE TRIGGER contexts_set_updated_at
     BEFORE UPDATE ON contexts
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- Full ancestry of every context, for inheriting settings from a parent and for
+-- session scoping: opening job A should also open its children.
+CREATE VIEW context_tree AS
+WITH RECURSIVE walk AS (
+    SELECT
+        c.id,
+        c.user_id,
+        c.id        AS root_id,
+        c.name      AS path,
+        0           AS depth,
+        ARRAY[c.id] AS ancestry
+    FROM contexts c
+    WHERE c.parent_id IS NULL
+
+    UNION ALL
+
+    SELECT
+        c.id,
+        c.user_id,
+        w.root_id,
+        w.path || ' / ' || c.name,
+        w.depth + 1,
+        w.ancestry || c.id
+    FROM contexts c
+    JOIN walk w ON c.parent_id = w.id
+)
+SELECT * FROM walk;
+
 -- +goose Down
 
+DROP VIEW IF EXISTS context_tree;
 DROP TABLE IF EXISTS contexts;
 DROP FUNCTION IF EXISTS contexts_prevent_cycle();
-DROP TABLE IF EXISTS users;
+DROP TYPE IF EXISTS context_kind;

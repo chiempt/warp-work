@@ -1,4 +1,24 @@
+-- What the signals turned into: tasks, events, commitments, reminders, metrics.
+--
+-- Commitments are the highest-value table in the system.
+
 -- +goose Up
+
+CREATE TYPE task_status AS ENUM ('open', 'in_progress', 'blocked', 'done', 'dropped');
+
+CREATE TYPE task_owner AS ENUM ('me', 'agent');
+
+CREATE TYPE event_status AS ENUM ('confirmed', 'tentative', 'cancelled');
+
+CREATE TYPE commitment_direction AS ENUM ('i_owe', 'owed_to_me');
+
+CREATE TYPE commitment_status AS ENUM ('open', 'fulfilled', 'waived', 'dropped');
+
+CREATE TYPE reminder_channel AS ENUM ('app', 'email', 'push');
+
+CREATE TYPE reminder_status AS ENUM ('scheduled', 'sent', 'cancelled', 'failed');
+
+CREATE TYPE metric_source AS ENUM ('manual', 'import', 'derived');
 
 CREATE TABLE tasks (
     id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -35,10 +55,13 @@ CREATE TABLE tasks (
 -- The main board query: what is live in this context, soonest first.
 CREATE INDEX tasks_live_idx ON tasks (context_id, due_at NULLS LAST, priority)
     WHERE status IN ('open', 'in_progress', 'blocked');
+
 -- Agent work queue.
 CREATE INDEX tasks_agent_queue_idx ON tasks (context_id, priority)
     WHERE owner = 'agent' AND status = 'open';
+
 CREATE INDEX tasks_source_signal_idx ON tasks (source_signal_id);
+
 CREATE INDEX tasks_parent_idx ON tasks (parent_task_id);
 
 CREATE TRIGGER tasks_set_updated_at
@@ -75,6 +98,7 @@ CREATE UNIQUE INDEX events_unique_external_idx
 
 CREATE INDEX events_upcoming_idx ON events (start_at)
     WHERE status <> 'cancelled';
+
 CREATE INDEX events_context_idx ON events (context_id, start_at);
 
 CREATE TRIGGER events_set_updated_at
@@ -113,9 +137,12 @@ CREATE TABLE commitments (
 
 CREATE INDEX commitments_open_idx ON commitments (due_at NULLS LAST, direction)
     WHERE status = 'open';
+
 CREATE INDEX commitments_person_idx ON commitments (person_id)
     WHERE status = 'open';
+
 CREATE INDEX commitments_context_idx ON commitments (context_id, status);
+
 CREATE INDEX commitments_unconfirmed_idx ON commitments (created_at)
     WHERE is_confirmed = false;
 
@@ -150,8 +177,11 @@ CREATE TABLE reminders (
 -- The dispatcher's only query.
 CREATE INDEX reminders_due_idx ON reminders (remind_at)
     WHERE status = 'scheduled';
+
 CREATE INDEX reminders_task_idx ON reminders (task_id);
+
 CREATE INDEX reminders_event_idx ON reminders (event_id);
+
 CREATE INDEX reminders_commitment_idx ON reminders (commitment_id);
 
 -- Generic numeric series, serving the sport and fitness contexts.
@@ -172,10 +202,31 @@ CREATE TABLE metrics (
 
 CREATE INDEX metrics_series_idx ON metrics (context_id, metric, recorded_at DESC);
 
+-- Overdue is derived, never stored, so it can never go stale.
+CREATE VIEW commitments_live AS
+SELECT
+    c.*,
+    (c.due_at IS NOT NULL AND c.due_at < now()) AS is_overdue,
+    CASE
+        WHEN c.due_at IS NULL THEN NULL
+        ELSE date_part('day', now() - c.due_at)::integer
+    END AS days_overdue
+FROM commitments c
+WHERE c.status = 'open';
+
 -- +goose Down
 
+DROP VIEW IF EXISTS commitments_live;
 DROP TABLE IF EXISTS metrics;
 DROP TABLE IF EXISTS reminders;
 DROP TABLE IF EXISTS commitments;
 DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS tasks;
+DROP TYPE IF EXISTS metric_source;
+DROP TYPE IF EXISTS reminder_status;
+DROP TYPE IF EXISTS reminder_channel;
+DROP TYPE IF EXISTS commitment_status;
+DROP TYPE IF EXISTS commitment_direction;
+DROP TYPE IF EXISTS event_status;
+DROP TYPE IF EXISTS task_owner;
+DROP TYPE IF EXISTS task_status;

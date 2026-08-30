@@ -149,3 +149,48 @@ export function MessengerMark() {
     </svg>
   )
 }
+
+/** Instagram Business — Business and Creator accounts only. */
+export function InstagramMark() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      role="img"
+      aria-label="Instagram Business"
+      className="size-full"
+    >
+      <linearGradient
+        id="warp-instagram-gradient"
+        x1="2"
+        y1="22"
+        x2="22"
+        y2="2"
+        gradientUnits="userSpaceOnUse"
+      >
+        <stop offset="0" stopColor="#FFC107" />
+        <stop offset=".35" stopColor="#F44336" />
+        <stop offset=".7" stopColor="#9C27B0" />
+        <stop offset="1" stopColor="#3F51B5" />
+      </linearGradient>
+      <rect
+        x="2"
+        y="2"
+        width="20"
+        height="20"
+        rx="6"
+        fill="none"
+        stroke="url(#warp-instagram-gradient)"
+        strokeWidth="2"
+      />
+      <circle
+        cx="12"
+        cy="12"
+        r="4.2"
+        fill="none"
+        stroke="url(#warp-instagram-gradient)"
+        strokeWidth="2"
+      />
+      <circle cx="17.4" cy="6.6" r="1.2" fill="url(#warp-instagram-gradient)" />
+    </svg>
+  )
+}

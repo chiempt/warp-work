@@ -1,4 +1,8 @@
+-- Trust, earned per (context, action type) and never granted globally.
+
 -- +goose Up
+
+CREATE TYPE autonomy_outcome AS ENUM ('approved_unchanged', 'edited', 'rejected');
 
 -- Autonomy is a property of the pair (context, action type), never of the
 -- system as a whole. Everything starts at 'draft'.
@@ -38,48 +42,37 @@ CREATE TABLE autonomy_evidence (
 CREATE INDEX autonomy_evidence_streak_idx
     ON autonomy_evidence (autonomy_rule_id, created_at DESC);
 
-CREATE TABLE reports (
-    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id      uuid        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    session_id   uuid        REFERENCES work_sessions (id) ON DELETE SET NULL,
-    kind         report_kind NOT NULL,
-    period_start timestamptz NOT NULL,
-    period_end   timestamptz NOT NULL,
-    content_md   text        NOT NULL,
-    created_at   timestamptz NOT NULL DEFAULT now(),
-
-    CONSTRAINT reports_period_order CHECK (period_end >= period_start),
-    CONSTRAINT reports_session_kind CHECK (
-        (kind = 'session' AND session_id IS NOT NULL)
-        OR (kind <> 'session')
+-- Consecutive clean approvals per autonomy rule, counting back from the most
+-- recent review. One edit or rejection resets the streak to zero. Drives the
+-- "may I stop asking about this?" prompt.
+CREATE VIEW autonomy_streaks AS
+SELECT
+    r.id   AS autonomy_rule_id,
+    r.context_id,
+    r.action_type_code,
+    r.level,
+    a.upgrade_threshold,
+    s.clean_streak,
+    (r.level <> 'auto' AND s.clean_streak >= a.upgrade_threshold) AS upgrade_ready
+FROM autonomy_rules r
+JOIN action_types a ON a.code = r.action_type_code
+LEFT JOIN LATERAL (
+    WITH ranked AS (
+        SELECT
+            e.outcome,
+            row_number() OVER (ORDER BY e.created_at DESC) AS rn
+        FROM autonomy_evidence e
+        WHERE e.autonomy_rule_id = r.id
     )
-);
-
-CREATE INDEX reports_recent_idx ON reports (user_id, kind, period_start DESC);
-
--- Append-only history of every mutation, whoever caused it. bigint identity
--- rather than uuid: this table grows faster than any other and is only ever
--- read in time order.
-CREATE TABLE audit_log (
-    id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    user_id     uuid        REFERENCES users (id) ON DELETE SET NULL,
-    entity_type text        NOT NULL,
-    entity_id   uuid,
-    action      text        NOT NULL,
-    actor       audit_actor NOT NULL,
-    -- {"before": {...}, "after": {...}}
-    diff        jsonb,
-    created_at  timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX audit_log_entity_idx ON audit_log (entity_type, entity_id, created_at DESC);
-CREATE INDEX audit_log_time_idx ON audit_log (created_at DESC);
-CREATE INDEX audit_log_agent_idx ON audit_log (created_at DESC)
-    WHERE actor = 'agent';
+    SELECT COALESCE(
+        (SELECT min(rn) - 1 FROM ranked WHERE outcome <> 'approved_unchanged'),
+        (SELECT count(*) FROM ranked)
+    )::integer AS clean_streak
+) s ON true;
 
 -- +goose Down
 
-DROP TABLE IF EXISTS audit_log;
-DROP TABLE IF EXISTS reports;
+DROP VIEW IF EXISTS autonomy_streaks;
 DROP TABLE IF EXISTS autonomy_evidence;
 DROP TABLE IF EXISTS autonomy_rules;
+DROP TYPE IF EXISTS autonomy_outcome;

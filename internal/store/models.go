@@ -277,48 +277,48 @@ func (ns NullAuditActor) Value() (driver.Value, error) {
 	return string(ns.AuditActor), nil
 }
 
-type AuthProvider string
+type AuthProviderKind string
 
 const (
-	AuthProviderGoogle   AuthProvider = "google"
-	AuthProviderZalo     AuthProvider = "zalo"
-	AuthProviderFacebook AuthProvider = "facebook"
-	AuthProviderPasskey  AuthProvider = "passkey"
+	AuthProviderKindGoogle   AuthProviderKind = "google"
+	AuthProviderKindZalo     AuthProviderKind = "zalo"
+	AuthProviderKindFacebook AuthProviderKind = "facebook"
+	AuthProviderKindPasskey  AuthProviderKind = "passkey"
 )
 
-func (e *AuthProvider) Scan(src interface{}) error {
+func (e *AuthProviderKind) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = AuthProvider(s)
+		*e = AuthProviderKind(s)
 	case string:
-		*e = AuthProvider(s)
+		*e = AuthProviderKind(s)
 	default:
-		return fmt.Errorf("unsupported scan type for AuthProvider: %T", src)
+		return fmt.Errorf("unsupported scan type for AuthProviderKind: %T", src)
 	}
 	return nil
 }
 
-type NullAuthProvider struct {
-	AuthProvider AuthProvider
-	Valid        bool // Valid is true if AuthProvider is not NULL
+type NullAuthProviderKind struct {
+	AuthProviderKind AuthProviderKind
+	Valid            bool // Valid is true if AuthProviderKind is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullAuthProvider) Scan(value interface{}) error {
+func (ns *NullAuthProviderKind) Scan(value interface{}) error {
 	if value == nil {
-		ns.AuthProvider, ns.Valid = "", false
+		ns.AuthProviderKind, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.AuthProvider.Scan(value)
+	return ns.AuthProviderKind.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullAuthProvider) Value() (driver.Value, error) {
+func (ns NullAuthProviderKind) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.AuthProvider), nil
+	return string(ns.AuthProviderKind), nil
 }
 
 type AutonomyLevel string
@@ -1237,10 +1237,10 @@ type AuditLog struct {
 	CreatedAt  pgtype.Timestamptz
 }
 
-type AuthIdentity struct {
+type AuthProvider struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID
-	Provider    AuthProvider
+	Kind        AuthProviderKind
 	Subject     string
 	Email       *string
 	IsPrimary   bool
@@ -1249,16 +1249,16 @@ type AuthIdentity struct {
 }
 
 type AuthSession struct {
-	ID         uuid.UUID
-	UserID     uuid.UUID
-	IdentityID *uuid.UUID
-	TokenHash  []byte
-	IssuedAt   pgtype.Timestamptz
-	LastSeenAt pgtype.Timestamptz
-	ExpiresAt  pgtype.Timestamptz
-	RevokedAt  pgtype.Timestamptz
-	UserAgent  string
-	Ip         *netip.Addr
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	AuthProviderID *uuid.UUID
+	TokenHash      []byte
+	IssuedAt       pgtype.Timestamptz
+	LastSeenAt     pgtype.Timestamptz
+	ExpiresAt      pgtype.Timestamptz
+	RevokedAt      pgtype.Timestamptz
+	UserAgent      string
+	Ip             *netip.Addr
 }
 
 type AutonomyEvidence struct {
@@ -1573,7 +1573,13 @@ type Task struct {
 }
 
 type User struct {
-	ID          uuid.UUID
+	ID        uuid.UUID
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+type UserProfile struct {
+	UserID      uuid.UUID
 	Email       string
 	DisplayName string
 	Timezone    string

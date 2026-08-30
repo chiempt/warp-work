@@ -3,14 +3,8 @@
 import * as React from "react"
 import {
   BanIcon,
-  CalendarIcon,
-  CameraIcon,
-  FolderIcon,
   KeyRoundIcon,
   LockIcon,
-  MailIcon,
-  MessageCircleIcon,
-  MessagesSquareIcon,
   PencilLineIcon,
   RefreshCwIcon,
   UnplugIcon,
@@ -51,6 +45,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { ContextChip } from "@/components/warp/context-chip"
+import {
+  CalendarMark,
+  DriveMark,
+  GmailMark,
+  InstagramMark,
+  MessengerMark,
+  ZaloOaMark,
+} from "@/components/warp/source-marks"
 import { ReliabilityBadge } from "@/components/warp/reliability"
 import { cn } from "@/lib/utils"
 import { formatRelative, formatStamp } from "@/lib/format"
@@ -64,7 +66,12 @@ interface Connector {
   name: string
   /** What the vendor actually offers — copied from context doc §4, not softened. */
   apiStatus: string
-  services: { icon: typeof MailIcon; label: string; detail: string }[]
+  /**
+   * The vendor's own mark, not a generic glyph. This is the one screen where a logo is
+   * the right call: the owner is picking a real account at a real company, and a mail
+   * envelope does not distinguish Gmail from anything else.
+   */
+  services: { icon: () => React.ReactElement; label: string; detail: string }[]
   scopes: string[]
   availability: Availability
   note: string
@@ -77,9 +84,9 @@ const connectors: Connector[] = [
     name: "Google account",
     apiStatus: "Full official API for Gmail, Calendar, and Drive under one OAuth grant.",
     services: [
-      { icon: MailIcon, label: "Gmail", detail: "email signals, delta sync by history id" },
-      { icon: CalendarIcon, label: "Calendar", detail: "events, incremental sync tokens" },
-      { icon: FolderIcon, label: "Drive", detail: "file signals, change feed" },
+      { icon: GmailMark, label: "Gmail", detail: "email signals, delta sync by history id" },
+      { icon: CalendarMark, label: "Calendar", detail: "events, incremental sync tokens" },
+      { icon: DriveMark, label: "Drive", detail: "file signals, change feed" },
     ],
     scopes: [
       "gmail.readonly",
@@ -97,7 +104,7 @@ const connectors: Connector[] = [
     apiStatus: "Official API — business Official Accounts only. There is no personal Zalo API.",
     services: [
       {
-        icon: MessageCircleIcon,
+        icon: ZaloOaMark,
         label: "Zalo OA",
         detail: "message signals for an Official Account you administer",
       },
@@ -118,7 +125,7 @@ const connectors: Connector[] = [
       "Official Graph API — Pages and Page inboxes only. Personal messages have no API at all.",
     services: [
       {
-        icon: MessagesSquareIcon,
+        icon: MessengerMark,
         label: "Page inbox",
         detail: "Messenger conversations addressed to a Page you administer",
       },
@@ -137,7 +144,7 @@ const connectors: Connector[] = [
     apiStatus: "Official Graph API — Business and Creator accounts only.",
     services: [
       {
-        icon: CameraIcon,
+        icon: InstagramMark,
         label: "Direct messages",
         detail: "messages to a Business account linked to a Page",
       },
@@ -245,7 +252,9 @@ function ConnectorCard({ connector }: { connector: Connector }) {
               key={service.label}
               className="flex items-start gap-2 rounded-lg border border-border px-3 py-2"
             >
-              <service.icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <span className="mt-0.5 size-4 shrink-0">
+                <service.icon />
+              </span>
               <div className="min-w-0">
                 <p className="text-sm font-medium">{service.label}</p>
                 <p className="text-xs text-muted-foreground">{service.detail}</p>

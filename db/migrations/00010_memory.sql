@@ -1,4 +1,8 @@
+-- The Work Graph: accumulated facts, retrieved by similarity.
+
 -- +goose Up
+
+CREATE TYPE memory_subject_type AS ENUM ('person', 'project', 'context', 'self');
 
 -- The Work Graph. Accumulated facts such as "the contact at remote job B needs
 -- PDF attachments, not links". Retrieved by similarity and injected into agent
@@ -40,6 +44,7 @@ CREATE INDEX memory_notes_embedding_idx ON memory_notes
 
 CREATE INDEX memory_notes_subject_idx ON memory_notes (subject_type, subject_id)
     WHERE superseded_by IS NULL;
+
 CREATE INDEX memory_notes_context_idx ON memory_notes (context_id)
     WHERE superseded_by IS NULL;
 
@@ -50,3 +55,4 @@ CREATE TRIGGER memory_notes_set_updated_at
 -- +goose Down
 
 DROP TABLE IF EXISTS memory_notes;
+DROP TYPE IF EXISTS memory_subject_type;
