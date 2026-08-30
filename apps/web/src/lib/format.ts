@@ -192,3 +192,56 @@ export function keyMonthYear(dayKey: string): string {
 export function hourLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`
 }
+
+/* ------------------------------------------------------------------------------------
+ * Form input conversion
+ *
+ * `<input type="datetime-local">` speaks naive wall time with no zone attached. The
+ * owner's wall clock is Asia/Ho_Chi_Minh, which is not necessarily the browser's — so
+ * both directions go through the owner zone explicitly rather than through the machine's
+ * locale. Getting this wrong moves every due date by the difference between two cities.
+ * ---------------------------------------------------------------------------------- */
+
+const ownerParts = new Intl.DateTimeFormat("en-GB", {
+  timeZone: OWNER_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+})
+
+/** UTC instant → `YYYY-MM-DDTHH:mm` in the owner's zone, for a datetime-local field. */
+export function toOwnerInput(iso: string | null): string {
+  if (iso === null) return ""
+  const parts = Object.fromEntries(
+    ownerParts.formatToParts(new Date(iso)).map((part) => [part.type, part.value]),
+  )
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
+}
+
+/** `YYYY-MM-DDTHH:mm` read as owner-local → UTC instant. */
+export function fromOwnerInput(value: string): string | null {
+  if (value === "") return null
+
+  // Read the naive value as if it were UTC, then measure how far the owner zone moves
+  // that instant. The difference is the offset to subtract. Works across a DST change
+  // because the offset is measured at the instant in question, not assumed.
+  const asIfUtc = new Date(`${value}:00Z`).getTime()
+  if (Number.isNaN(asIfUtc)) return null
+
+  const parts = Object.fromEntries(
+    ownerParts.formatToParts(new Date(asIfUtc)).map((part) => [part.type, part.value]),
+  )
+  const shifted = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+  )
+
+  return new Date(asIfUtc - (shifted - asIfUtc)).toISOString()
+}
+

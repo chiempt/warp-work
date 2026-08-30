@@ -8,12 +8,32 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// CompleteGoogleSignIn implements completeGoogleSignIn operation.
+	//
+	// Where Google returns the browser. Verifies `state` against the cookie, exchanges `code`, and matches
+	// the resulting `sub` claim against `auth_providers`. Matching is on `sub`, never on the email
+	// address: an email can be reassigned at the provider, and matching on it would hand the account to
+	// whoever inherits it.
+	//
+	// An identity that is not already linked is rejected. There is exactly one owner, and sign-in does not
+	// create accounts.
+	//
+	// On success, sets the session cookie and redirects to `returnTo`.
+	//
+	// GET /api/v1/auth/google/callback
+	CompleteGoogleSignIn(ctx context.Context, params CompleteGoogleSignInParams) (CompleteGoogleSignInRes, error)
 	// GetContext implements getContext operation.
 	//
 	// Get one context.
 	//
 	// GET /api/v1/contexts/{contextId}
 	GetContext(ctx context.Context, params GetContextParams) (GetContextRes, error)
+	// GetCurrentSession implements getCurrentSession operation.
+	//
+	// Who is signed in, and on what.
+	//
+	// GET /api/v1/auth/session
+	GetCurrentSession(ctx context.Context) (GetCurrentSessionRes, error)
 	// ListAccounts implements listAccounts operation.
 	//
 	// Every account carries a `reliability` tier. A client must show it wherever it shows data derived
@@ -21,12 +41,26 @@ type Handler interface {
 	//
 	// GET /api/v1/accounts
 	ListAccounts(ctx context.Context, params ListAccountsParams) (*AccountList, error)
+	// ListAuthProviders implements listAuthProviders operation.
+	//
+	// More than one is the point. A single way in is a single point of lockout, and there is no
+	// administrator to appeal to.
+	//
+	// GET /api/v1/auth/providers
+	ListAuthProviders(ctx context.Context) (ListAuthProvidersRes, error)
 	// ListContexts implements listContexts operation.
 	//
 	// Returns the context tree, parents before children, then by position.
 	//
 	// GET /api/v1/contexts
 	ListContexts(ctx context.Context, params ListContextsParams) (*ContextList, error)
+	// ListSessions implements listSessions operation.
+	//
+	// Sessions are server-side precisely so this list can exist and be acted on. A lost laptop is revoked
+	// from here, without rotating anything.
+	//
+	// GET /api/v1/auth/sessions
+	ListSessions(ctx context.Context) (ListSessionsRes, error)
 	// ListSignals implements listSignals operation.
 	//
 	// `contextIds` is required. There is deliberately no unfiltered signal listing: a client that could
@@ -37,6 +71,49 @@ type Handler interface {
 	//
 	// GET /api/v1/signals
 	ListSignals(ctx context.Context, params ListSignalsParams) (*SignalList, error)
+	// Login implements login operation.
+	//
+	// Sign in with an email and password.
+	//
+	// POST /api/v1/auth/login
+	Login(ctx context.Context, req *LoginRequest) (LoginRes, error)
+	// Register implements register operation.
+	//
+	// Warp has exactly one owner (see §2 of the context document). This endpoint therefore succeeds at
+	// most once: a second attempt is a 409, not a second account. It is not a public sign-up.
+	//
+	// POST /api/v1/auth/register
+	Register(ctx context.Context, req *RegisterRequest) (RegisterRes, error)
+	// RevokeSession implements revokeSession operation.
+	//
+	// Revoke one session.
+	//
+	// DELETE /api/v1/auth/sessions/{sessionId}
+	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
+	// SignOut implements signOut operation.
+	//
+	// Revokes this session only. Other browsers stay signed in — use `/auth/sessions/{sessionId}` to
+	// revoke one of those.
+	//
+	// DELETE /api/v1/auth/session
+	SignOut(ctx context.Context) (SignOutRes, error)
+	// StartGoogleSignIn implements startGoogleSignIn operation.
+	//
+	// Redirects to Google. Sets a short-lived, `HttpOnly` state cookie that the callback checks, which is
+	// what stops a forged callback from signing someone in.
+	//
+	// Scopes are `openid email profile` only. This grants no access to mail or calendar — connecting
+	// those is a separate consent, and lives with `accounts`.
+	//
+	// GET /api/v1/auth/google/start
+	StartGoogleSignIn(ctx context.Context, params StartGoogleSignInParams) (*StartGoogleSignInFound, error)
+	// UnlinkAuthProvider implements unlinkAuthProvider operation.
+	//
+	// Refuses to remove the last one — that is an unrecoverable lockout, and the database enforces it as
+	// well as this endpoint.
+	//
+	// DELETE /api/v1/auth/providers/{providerId}
+	UnlinkAuthProvider(ctx context.Context, params UnlinkAuthProviderParams) (UnlinkAuthProviderRes, error)
 	// NewError creates *ErrorStatusCode from error returned by handler.
 	//
 	// Used for common default response.
@@ -46,18 +123,20 @@ type Handler interface {
 // Server implements http server based on OpenAPI v3 specification and
 // calls Handler to handle requests.
 type Server struct {
-	h Handler
+	h   Handler
+	sec SecurityHandler
 	baseServer
 }
 
 // NewServer creates new Server.
-func NewServer(h Handler, opts ...ServerOption) (*Server, error) {
+func NewServer(h Handler, sec SecurityHandler, opts ...ServerOption) (*Server, error) {
 	s, err := newServerConfig(opts...).baseServer()
 	if err != nil {
 		return nil, err
 	}
 	return &Server{
 		h:          h,
+		sec:        sec,
 		baseServer: s,
 	}, nil
 }

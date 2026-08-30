@@ -17,8 +17,16 @@ info:
       and snippet, never `payload` — that is other people's correspondence, and
       the timeline does not need it.
 
-    Scope is Phase 1 (*See*): contexts, accounts, and the signal timeline. Work
-    items, sessions, and proposed actions arrive with later phases.
+    **Two things here involve Google OAuth and must not be confused.** Signing in
+    (`/auth/google/*`) proves the owner is themselves, asks only for
+    `openid email profile`, and produces a short session tied to them being
+    present. Connecting a mailbox writes to `accounts` instead, asks for Gmail
+    and Calendar scopes, and produces a refresh token that must keep working
+    unattended for months. Revoking a session must never stop the overnight sync.
+
+    Scope is Phase 1 (*See*): authentication, contexts, accounts, and the signal
+    timeline. Work items, work sessions, and proposed actions arrive with later
+    phases.
   contact:
     name: Warp
   license:
@@ -28,7 +36,15 @@ servers:
   - url: http://localhost:8080
     description: Local development
 
+# Everything requires a session unless it says otherwise. The two sign-in
+# endpoints override this with `security: []`, since requiring a session to
+# obtain one would be a closed loop.
+security:
+  - sessionCookie: []
+
 tags:
+  - name: auth
+    description: Signing in, and the sessions and sign-in methods that result.
   - name: contexts
     description: The life areas everything else hangs from.
   - name: accounts
@@ -37,6 +53,310 @@ tags:
     description: Immutable items as they arrived from the outside world.
 
 paths:
+  /api/v1/auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Create the owner account with an email and password
+      description: |
+        Warp has exactly one owner (see §2 of the context document). This
+        endpoint therefore succeeds at most once: a second attempt is a 409,
+        not a second account. It is not a public sign-up.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: The owner was created and is now signed in.
+          headers:
+            Set-Cookie:
+              description: The session cookie — `HttpOnly`, `Secure`, `SameSite=Lax`.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentSession"
+        "409":
+          description: An owner already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Sign in with an email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Signed in.
+          headers:
+            Set-Cookie:
+              description: The session cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentSession"
+        "401":
+          description: |
+            Wrong email or password. Deliberately one response for both, so the
+            endpoint cannot be used to discover which addresses exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Too many failed attempts; the account is temporarily locked.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/auth/google/start:
+    get:
+      operationId: startGoogleSignIn
+      tags: [auth]
+      summary: Begin signing in with Google
+      description: |
+        Redirects to Google. Sets a short-lived, `HttpOnly` state cookie that the
+        callback checks, which is what stops a forged callback from signing
+        someone in.
+
+        Scopes are `openid email profile` only. This grants no access to mail or
+        calendar — connecting those is a separate consent, and lives with
+        `accounts`.
+      security: []
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          description: |
+            Where to land after signing in. A path within this application only:
+            the pattern rejects an absolute URL and a protocol-relative `//host`,
+            so this cannot become an open redirect.
+          schema:
+            type: string
+            pattern: '^/([^/].*)?$'
+            maxLength: 512
+            default: /
+      responses:
+        "302":
+          description: Redirect to Google's consent screen.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+            Set-Cookie:
+              description: The `HttpOnly` state cookie.
+              schema:
+                type: string
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/auth/google/callback:
+    get:
+      operationId: completeGoogleSignIn
+      tags: [auth]
+      summary: Finish signing in with Google
+      description: |
+        Where Google returns the browser. Verifies `state` against the cookie,
+        exchanges `code`, and matches the resulting `sub` claim against
+        `auth_providers`. Matching is on `sub`, never on the email address: an
+        email can be reassigned at the provider, and matching on it would hand
+        the account to whoever inherits it.
+
+        An identity that is not already linked is rejected. There is exactly one
+        owner, and sign-in does not create accounts.
+
+        On success, sets the session cookie and redirects to `returnTo`.
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          description: Present when the owner declined at Google's consent screen.
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Signed in; redirecting into the application.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+            Set-Cookie:
+              description: The session cookie — `HttpOnly`, `Secure`, `SameSite=Lax`.
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/auth/session:
+    get:
+      operationId: getCurrentSession
+      tags: [auth]
+      summary: Who is signed in, and on what
+      responses:
+        "200":
+          description: The current session and the owner it belongs to.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentSession"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: signOut
+      tags: [auth]
+      summary: Sign out of this browser
+      description: |
+        Revokes this session only. Other browsers stay signed in — use
+        `/auth/sessions/{sessionId}` to revoke one of those.
+      responses:
+        "204":
+          description: Signed out.
+          headers:
+            Set-Cookie:
+              description: The session cookie, expired.
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/auth/sessions:
+    get:
+      operationId: listSessions
+      tags: [auth]
+      summary: Every browser currently signed in
+      description: |
+        Sessions are server-side precisely so this list can exist and be acted
+        on. A lost laptop is revoked from here, without rotating anything.
+      responses:
+        "200":
+          description: Live sessions, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/auth/sessions/{sessionId}:
+    delete:
+      operationId: revokeSession
+      tags: [auth]
+      summary: Revoke one session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Revoked. Already-revoked sessions also return 204.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/auth/providers:
+    get:
+      operationId: listAuthProviders
+      tags: [auth]
+      summary: The ways the owner can sign in
+      description: |
+        More than one is the point. A single way in is a single point of lockout,
+        and there is no administrator to appeal to.
+      responses:
+        "200":
+          description: Linked sign-in methods.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkedProviderList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/auth/providers/{providerId}:
+    delete:
+      operationId: unlinkAuthProvider
+      tags: [auth]
+      summary: Unlink a sign-in method
+      description: |
+        Refuses to remove the last one — that is an unrecoverable lockout, and
+        the database enforces it as well as this endpoint.
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Unlinked.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: This is the only way in left.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          $ref: "#/components/responses/Error"
+
   /api/v1/contexts:
     get:
       operationId: listContexts
@@ -159,6 +479,16 @@ paths:
           $ref: "#/components/responses/Error"
 
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: warp_session
+      description: |
+        An opaque session token. The server stores only its hash, so a database
+        dump is not enough to sign in. `HttpOnly`, so a scripting flaw in the
+        dashboard cannot read it.
+
   parameters:
     ContextId:
       name: contextId
@@ -177,6 +507,12 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     NotFound:
       description: No such resource.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Unauthenticated:
+      description: No valid session.
       content:
         application/json:
           schema:
@@ -211,6 +547,150 @@ components:
           type: object
           additionalProperties: true
           description: Structured detail, when there is any that is safe to return.
+
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 128
+          description: |
+            Length is the only rule the contract enforces. Composition rules
+            push people towards predictable substitutions; length does not.
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          format: password
+          maxLength: 128
+
+    AuthProviderKind:
+      type: string
+      description: |
+        How a sign-in method authenticates. `zalo` and `facebook` are sign-in
+        products distinct from their messaging APIs — linking one grants no
+        access to messages.
+      enum: [google, zalo, facebook, passkey, password]
+
+    LinkedProvider:
+      type: object
+      required: [id, kind, isPrimary, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/AuthProviderKind"
+        email:
+          type: string
+          description: |
+            What the provider reported when this was linked. Display only — it
+            is not what authenticates, and a passkey has none.
+        isPrimary:
+          type: boolean
+        linkedAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    LinkedProviderList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkedProvider"
+
+    Session:
+      type: object
+      description: |
+        A browser that is signed in. The token itself never appears here — only
+        the server-side record of it.
+      required: [id, issuedAt, lastSeenAt, expiresAt, isCurrent]
+      properties:
+        id:
+          type: string
+          format: uuid
+        providerKind:
+          $ref: "#/components/schemas/AuthProviderKind"
+        issuedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        userAgent:
+          type: string
+          description: Enough to recognise which browser this is, and revoke the right one.
+        ip:
+          type: string
+          nullable: true
+        isCurrent:
+          type: boolean
+          description: True for the session making this request.
+
+    SessionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+
+    SignedInUser:
+      type: object
+      required: [id, email, displayName, timezone]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          description: |
+            The canonical address the owner declares. Not what authenticates
+            them — sign-in matches on the provider's immutable subject.
+        displayName:
+          type: string
+        timezone:
+          type: string
+          description: |
+            Presentation only. Everything is stored and returned in UTC.
+          example: Asia/Ho_Chi_Minh
+
+    CurrentSession:
+      type: object
+      required: [user, session]
+      properties:
+        user:
+          $ref: "#/components/schemas/SignedInUser"
+        session:
+          $ref: "#/components/schemas/Session"
 
     ContextKind:
       type: string

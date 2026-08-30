@@ -6,8 +6,18 @@ package api
 type OperationName = string
 
 const (
-	GetContextOperation   OperationName = "GetContext"
-	ListAccountsOperation OperationName = "ListAccounts"
-	ListContextsOperation OperationName = "ListContexts"
-	ListSignalsOperation  OperationName = "ListSignals"
+	CompleteGoogleSignInOperation OperationName = "CompleteGoogleSignIn"
+	GetContextOperation           OperationName = "GetContext"
+	GetCurrentSessionOperation    OperationName = "GetCurrentSession"
+	ListAccountsOperation         OperationName = "ListAccounts"
+	ListAuthProvidersOperation    OperationName = "ListAuthProviders"
+	ListContextsOperation         OperationName = "ListContexts"
+	ListSessionsOperation         OperationName = "ListSessions"
+	ListSignalsOperation          OperationName = "ListSignals"
+	LoginOperation                OperationName = "Login"
+	RegisterOperation             OperationName = "Register"
+	RevokeSessionOperation        OperationName = "RevokeSession"
+	SignOutOperation              OperationName = "SignOut"
+	StartGoogleSignInOperation    OperationName = "StartGoogleSignIn"
+	UnlinkAuthProviderOperation   OperationName = "UnlinkAuthProvider"
 )

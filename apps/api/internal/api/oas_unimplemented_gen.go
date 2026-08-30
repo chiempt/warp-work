@@ -13,12 +13,38 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// CompleteGoogleSignIn implements completeGoogleSignIn operation.
+//
+// Where Google returns the browser. Verifies `state` against the cookie, exchanges `code`, and matches
+// the resulting `sub` claim against `auth_providers`. Matching is on `sub`, never on the email
+// address: an email can be reassigned at the provider, and matching on it would hand the account to
+// whoever inherits it.
+//
+// An identity that is not already linked is rejected. There is exactly one owner, and sign-in does not
+// create accounts.
+//
+// On success, sets the session cookie and redirects to `returnTo`.
+//
+// GET /api/v1/auth/google/callback
+func (UnimplementedHandler) CompleteGoogleSignIn(ctx context.Context, params CompleteGoogleSignInParams) (r CompleteGoogleSignInRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetContext implements getContext operation.
 //
 // Get one context.
 //
 // GET /api/v1/contexts/{contextId}
 func (UnimplementedHandler) GetContext(ctx context.Context, params GetContextParams) (r GetContextRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetCurrentSession implements getCurrentSession operation.
+//
+// Who is signed in, and on what.
+//
+// GET /api/v1/auth/session
+func (UnimplementedHandler) GetCurrentSession(ctx context.Context) (r GetCurrentSessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -32,12 +58,32 @@ func (UnimplementedHandler) ListAccounts(ctx context.Context, params ListAccount
 	return r, ht.ErrNotImplemented
 }
 
+// ListAuthProviders implements listAuthProviders operation.
+//
+// More than one is the point. A single way in is a single point of lockout, and there is no
+// administrator to appeal to.
+//
+// GET /api/v1/auth/providers
+func (UnimplementedHandler) ListAuthProviders(ctx context.Context) (r ListAuthProvidersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListContexts implements listContexts operation.
 //
 // Returns the context tree, parents before children, then by position.
 //
 // GET /api/v1/contexts
 func (UnimplementedHandler) ListContexts(ctx context.Context, params ListContextsParams) (r *ContextList, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListSessions implements listSessions operation.
+//
+// Sessions are server-side precisely so this list can exist and be acted on. A lost laptop is revoked
+// from here, without rotating anything.
+//
+// GET /api/v1/auth/sessions
+func (UnimplementedHandler) ListSessions(ctx context.Context) (r ListSessionsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -51,6 +97,67 @@ func (UnimplementedHandler) ListContexts(ctx context.Context, params ListContext
 //
 // GET /api/v1/signals
 func (UnimplementedHandler) ListSignals(ctx context.Context, params ListSignalsParams) (r *SignalList, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// Login implements login operation.
+//
+// Sign in with an email and password.
+//
+// POST /api/v1/auth/login
+func (UnimplementedHandler) Login(ctx context.Context, req *LoginRequest) (r LoginRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// Register implements register operation.
+//
+// Warp has exactly one owner (see §2 of the context document). This endpoint therefore succeeds at
+// most once: a second attempt is a 409, not a second account. It is not a public sign-up.
+//
+// POST /api/v1/auth/register
+func (UnimplementedHandler) Register(ctx context.Context, req *RegisterRequest) (r RegisterRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RevokeSession implements revokeSession operation.
+//
+// Revoke one session.
+//
+// DELETE /api/v1/auth/sessions/{sessionId}
+func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSessionParams) (r RevokeSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// SignOut implements signOut operation.
+//
+// Revokes this session only. Other browsers stay signed in — use `/auth/sessions/{sessionId}` to
+// revoke one of those.
+//
+// DELETE /api/v1/auth/session
+func (UnimplementedHandler) SignOut(ctx context.Context) (r SignOutRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// StartGoogleSignIn implements startGoogleSignIn operation.
+//
+// Redirects to Google. Sets a short-lived, `HttpOnly` state cookie that the callback checks, which is
+// what stops a forged callback from signing someone in.
+//
+// Scopes are `openid email profile` only. This grants no access to mail or calendar — connecting
+// those is a separate consent, and lives with `accounts`.
+//
+// GET /api/v1/auth/google/start
+func (UnimplementedHandler) StartGoogleSignIn(ctx context.Context, params StartGoogleSignInParams) (r *StartGoogleSignInFound, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// UnlinkAuthProvider implements unlinkAuthProvider operation.
+//
+// Refuses to remove the last one — that is an unrecoverable lockout, and the database enforces it as
+// well as this endpoint.
+//
+// DELETE /api/v1/auth/providers/{providerId}
+func (UnimplementedHandler) UnlinkAuthProvider(ctx context.Context, params UnlinkAuthProviderParams) (r UnlinkAuthProviderRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

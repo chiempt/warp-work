@@ -110,6 +110,23 @@ export interface WorkEvent {
   status: EventStatus
   personId: string | null
   sourceSignalId: string | null
+  /**
+   * The calendar this event lives on outside Warp, or null for a local one.
+   *
+   * It decides whether an edit is a local write or an outbound action: changing an event
+   * that exists in someone else's calendar is a change other people see, so it goes
+   * through `proposed_actions` like any other thing that leaves the system.
+   */
+  externalCalendarId: string | null
+}
+
+/** A sync attempt, for the panel that reports one. */
+export interface SyncResult {
+  at: string
+  fetched: number
+  created: number
+  updated: number
+  unchanged: number
 }
 
 export interface Commitment {
@@ -121,7 +138,12 @@ export interface Commitment {
   promisedAt: string
   dueAt: string | null
   status: CommitmentStatus
-  evidenceSignalId: string
+  /**
+   * Null when the owner recorded the promise by hand — a phone call leaves no signal.
+   * The interface always says which of the two a commitment is; that distinction is the
+   * whole reason the table can be trusted.
+   */
+  evidenceSignalId: string | null
 }
 
 export interface ProposedAction {

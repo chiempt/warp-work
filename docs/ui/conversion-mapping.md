@@ -14,10 +14,11 @@ Rules that produced this mapping live in [CLAUDE.md](../../CLAUDE.md) and
 
 | Route | Screen | Reads | Owns the interaction |
 |---|---|---|---|
-| `/login` | Sign in | — | Single-user gate. No sign-up, no social login, no emailed reset. |
+| `/login` | Sign in | `users` | Google (pinned to the owner's account) or a passphrase. No emailed reset. |
+| `/register` | Create account | `users` | Provisions the one owner. The API closes the route once it exists. |
 | `/` | Dashboard | `proposed_actions`, `commitments`, `signals`, `events`, `tasks`, `work_sessions` | **Review queue** — approve / edit / reject. The most-used interaction in the product. |
-| `/work-items` | Work items | `tasks`, `commitments` | Filter by context and status; task detail in a `Sheet` with its source signal. |
-| `/schedule` | Schedule | `events`, `tasks.due_at`, `commitments.due_at` | Two modes — agenda over a 7-day horizon, or a week/month calendar grid. |
+| `/work-items` | Work items | `tasks`, `commitments` | Filter by context and status; create, edit, and resolve either kind; task detail in a `Sheet` with its source signal. |
+| `/schedule` | Schedule | `events`, `tasks.due_at`, `commitments.due_at` | Two modes — agenda, or a week/month grid. Create and edit events; pull Google Calendar. |
 | `/audit-log` | Audit log | `audit_log` | Filter by actor; expand a row for the `diff`. |
 | `/reports` | Reports | `reports` | Pick a report; read it. |
 | `/settings` | Contexts | `contexts`, `accounts`, `autonomy_rules` | Edit name, active hours, tone profile. |
@@ -38,11 +39,16 @@ one.
 | Signal timeline | `Card` + `SignalRow` | Dense rows, routing source and confidence inline. |
 | Review queue | `article` + `Textarea` + `AlertDialog` | Keyboard-first batch work; approval is a confirm, not a click. |
 | Task list | `Table` → `Sheet` | Scannable at a glance, whole record one click away. |
+| Create / edit | `Sheet` form per kind | Mirrors the table's `CHECK` constraints, so the UI cannot assemble a row Postgres would refuse. |
+| Row actions | `DropdownMenu` | Status moves without opening the record. Labels must sit in a `DropdownMenuGroup` — Base UI throws otherwise. |
+| Date entry | `datetime-local` through `lib/format` | The field is naive wall time; the conversion is pinned to the owner zone, not the browser's. |
 | Commitments board | Two columns by `direction` | Two values, no third case — the split *is* the model. |
 | Agenda | Grouped `ul` per owner-local day | Answers "what is coming": time is the index, empty hours cost nothing. |
 | Calendar — week | Absolute blocks over a 24 h axis | Answers "where does this fit": duration and free space drawn to scale. |
 | Calendar — month | 6 × 7 grid, 3 entries a cell | Shape of a month. Overflow is counted, never silently clipped. |
 | Active hours | `Card` beside both modes | The rule that decides what the schedule is allowed to show. |
+| Calendar sync | `Popover` + `GoogleSync` | Delta only. Names every feeding account and its reliability tier — a sync against a degraded source produced an incomplete answer. |
+| Event form | `Sheet` + `EventForm` | Local write, or a queued proposed action when the record also lives on Google. |
 | Audit entry | Expandable row + `dl` diff | Read after the fact: dense list, full before/after on demand. |
 | Report | Four fixed sections | Done / Waiting / Blocked / Due next, always in that order. |
 | Context | `ContextChip` — dot + name | Repeated on nearly every row; a filled pill would read as an alert. |
@@ -79,12 +85,13 @@ an `IntersectionObserver` firing.
 
 There are no gradient backgrounds, beams, or glassmorphism on any operational surface.
 
-### 3.1 The login screen is the one decorative surface
+### 3.1 The auth screens are the one decorative surface
 
 CLAUDE.md bans animated backgrounds and beams on the surfaces read every day, and that is
 unchanged for all of them — dashboard, work items, schedule, audit log, reports, settings.
-`/login` sits outside that set: seconds of attention, no operational data, no decision made
-from it.
+`/login` and `/register` sit outside that set: seconds of attention, no operational data,
+no decision made from them. They share one shell — `app/(auth)/layout.tsx` — so the panel
+is written once.
 
 Even there, the decoration is the product rather than an effect on top of it. The left
 panel is a field of warp threads — the metaphor the product is named for (context doc §12),
@@ -119,6 +126,11 @@ can quietly break, and how each is held:
 
 1. **Nothing leaves without a trace.** No screen has a send control. The only path
    outward is the review queue, and its confirm names the recipient and the undo window.
+   The calendar is the sharpest case: an event with an `external_calendar_id` lives on a
+   calendar other people can see, so editing it is an outbound action. The event form
+   saves nothing to Google — it queues a `proposed_action` and says so, and its footer
+   button reads *Queue change for review* instead of *Save*. Creating a local event may
+   also queue a `create_event` action, never perform one.
 2. **Context is the axis.** Every row carries a `ContextChip`; the session bar shows the
    contexts agents may touch; the tone profile applied to a draft is printed under it.
 3. **A failing source is visible.** `DegradedSourceNotice` sits above the data it
@@ -133,7 +145,11 @@ can quietly break, and how each is held:
    positions everything by *day key* — `YYYY-MM-DD` already resolved to the owner's zone
    — and does plain date arithmetic on it. Re-applying a timezone to a day key is how
    calendars land a day out on either side of a DST boundary.
-6. **A derived date never looks like an agreed one.** In the week grid a calendar event
+6. **A hand-written record never looks derived.** A task created by hand is saved with no
+   `source_signal_id` and its detail sheet says so; a commitment recorded by hand has no
+   evidence and reads *recorded by hand* wherever it appears. Editing changes the derived
+   record only — the signal behind it is immutable and re-extraction has to stay possible.
+7. **A derived date never looks like an agreed one.** In the week grid a calendar event
    is a solid block and a task or commitment deadline is dashed; in the month grid the
    dot is filled or hollow. A deadline that reads as a meeting gets treated like one.
 
@@ -150,4 +166,5 @@ inviting the owner to add a row by hand: work items are derived, not typed.
   `src/lib/mock/` is deleted and its types are replaced by generated ones.
 - No dark-mode switch. Tokens for both themes exist in `globals.css`; nothing toggles
   `.dark` at the root yet — the login panel scopes it to one element deliberately.
-- No auth. `/login` navigates to `/` and sets nothing.
+- No auth. `/login` and `/register` navigate to `/` and set nothing. The Google button
+  runs no OAuth flow; pinning the grant to a single `sub` is an API concern.

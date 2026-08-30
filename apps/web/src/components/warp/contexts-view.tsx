@@ -114,7 +114,7 @@ export function ContextsView() {
       </div>
 
       <Sheet open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
-        <SheetContent className="w-full sm:max-w-lg">
+        <SheetContent className="w-full data-[side=right]:sm:max-w-xl">
           {editing ? (
             <>
               <SheetHeader>

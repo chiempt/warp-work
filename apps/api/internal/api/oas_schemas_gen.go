@@ -212,6 +212,99 @@ func (s *AssignedBy) UnmarshalText(data []byte) error {
 	}
 }
 
+// How a sign-in method authenticates. `zalo` and `facebook` are sign-in products distinct from their
+// messaging APIs — linking one grants no access to messages.
+// Ref: #/components/schemas/AuthProviderKind
+type AuthProviderKind string
+
+const (
+	AuthProviderKindGoogle   AuthProviderKind = "google"
+	AuthProviderKindZalo     AuthProviderKind = "zalo"
+	AuthProviderKindFacebook AuthProviderKind = "facebook"
+	AuthProviderKindPasskey  AuthProviderKind = "passkey"
+	AuthProviderKindPassword AuthProviderKind = "password"
+)
+
+// AllValues returns all AuthProviderKind values.
+func (AuthProviderKind) AllValues() []AuthProviderKind {
+	return []AuthProviderKind{
+		AuthProviderKindGoogle,
+		AuthProviderKindZalo,
+		AuthProviderKindFacebook,
+		AuthProviderKindPasskey,
+		AuthProviderKindPassword,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthProviderKind) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthProviderKindGoogle:
+		return []byte(s), nil
+	case AuthProviderKindZalo:
+		return []byte(s), nil
+	case AuthProviderKindFacebook:
+		return []byte(s), nil
+	case AuthProviderKindPasskey:
+		return []byte(s), nil
+	case AuthProviderKindPassword:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthProviderKind) UnmarshalText(data []byte) error {
+	switch AuthProviderKind(data) {
+	case AuthProviderKindGoogle:
+		*s = AuthProviderKindGoogle
+		return nil
+	case AuthProviderKindZalo:
+		*s = AuthProviderKindZalo
+		return nil
+	case AuthProviderKindFacebook:
+		*s = AuthProviderKindFacebook
+		return nil
+	case AuthProviderKindPasskey:
+		*s = AuthProviderKindPasskey
+		return nil
+	case AuthProviderKindPassword:
+		*s = AuthProviderKindPassword
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// CompleteGoogleSignInFound is response for CompleteGoogleSignIn operation.
+type CompleteGoogleSignInFound struct {
+	Location  string
+	SetCookie OptString
+}
+
+// GetLocation returns the value of Location.
+func (s *CompleteGoogleSignInFound) GetLocation() string {
+	return s.Location
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *CompleteGoogleSignInFound) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// SetLocation sets the value of Location.
+func (s *CompleteGoogleSignInFound) SetLocation(val string) {
+	s.Location = val
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *CompleteGoogleSignInFound) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
+
+func (*CompleteGoogleSignInFound) completeGoogleSignInRes() {}
+
 // Ref: #/components/schemas/Context
 type Context struct {
 	ID uuid.UUID `json:"id"`
@@ -406,6 +499,63 @@ func (s *ContextList) SetItems(val []Context) {
 	s.Items = val
 }
 
+// Ref: #/components/schemas/CurrentSession
+type CurrentSession struct {
+	User    SignedInUser `json:"user"`
+	Session Session      `json:"session"`
+}
+
+// GetUser returns the value of User.
+func (s *CurrentSession) GetUser() SignedInUser {
+	return s.User
+}
+
+// GetSession returns the value of Session.
+func (s *CurrentSession) GetSession() Session {
+	return s.Session
+}
+
+// SetUser sets the value of User.
+func (s *CurrentSession) SetUser(val SignedInUser) {
+	s.User = val
+}
+
+// SetSession sets the value of Session.
+func (s *CurrentSession) SetSession(val Session) {
+	s.Session = val
+}
+
+func (*CurrentSession) getCurrentSessionRes() {}
+
+// CurrentSessionHeaders wraps CurrentSession with response headers.
+type CurrentSessionHeaders struct {
+	SetCookie OptString
+	Response  CurrentSession
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *CurrentSessionHeaders) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// GetResponse returns the value of Response.
+func (s *CurrentSessionHeaders) GetResponse() CurrentSession {
+	return s.Response
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *CurrentSessionHeaders) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CurrentSessionHeaders) SetResponse(val CurrentSession) {
+	s.Response = val
+}
+
+func (*CurrentSessionHeaders) loginRes()    {}
+func (*CurrentSessionHeaders) registerRes() {}
+
 // Ref: #/components/schemas/Error
 type Error struct {
 	// Stable, machine-readable. Safe to switch on.
@@ -475,7 +625,42 @@ func (s *ErrorEnvelope) SetError(val Error) {
 	s.Error = val
 }
 
-func (*ErrorEnvelope) getContextRes() {}
+func (*ErrorEnvelope) completeGoogleSignInRes() {}
+func (*ErrorEnvelope) getContextRes()           {}
+func (*ErrorEnvelope) getCurrentSessionRes()    {}
+func (*ErrorEnvelope) listAuthProvidersRes()    {}
+func (*ErrorEnvelope) listSessionsRes()         {}
+func (*ErrorEnvelope) loginRes()                {}
+func (*ErrorEnvelope) registerRes()             {}
+func (*ErrorEnvelope) signOutRes()              {}
+
+// ErrorEnvelopeHeaders wraps ErrorEnvelope with response headers.
+type ErrorEnvelopeHeaders struct {
+	RetryAfter OptInt
+	Response   ErrorEnvelope
+}
+
+// GetRetryAfter returns the value of RetryAfter.
+func (s *ErrorEnvelopeHeaders) GetRetryAfter() OptInt {
+	return s.RetryAfter
+}
+
+// GetResponse returns the value of Response.
+func (s *ErrorEnvelopeHeaders) GetResponse() ErrorEnvelope {
+	return s.Response
+}
+
+// SetRetryAfter sets the value of RetryAfter.
+func (s *ErrorEnvelopeHeaders) SetRetryAfter(val OptInt) {
+	s.RetryAfter = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ErrorEnvelopeHeaders) SetResponse(val ErrorEnvelope) {
+	s.Response = val
+}
+
+func (*ErrorEnvelopeHeaders) loginRes() {}
 
 // ErrorStatusCode wraps ErrorEnvelope with StatusCode.
 type ErrorStatusCode struct {
@@ -501,6 +686,121 @@ func (s *ErrorStatusCode) SetStatusCode(val int) {
 // SetResponse sets the value of Response.
 func (s *ErrorStatusCode) SetResponse(val ErrorEnvelope) {
 	s.Response = val
+}
+
+// Ref: #/components/schemas/LinkedProvider
+type LinkedProvider struct {
+	ID   uuid.UUID        `json:"id"`
+	Kind AuthProviderKind `json:"kind"`
+	// What the provider reported when this was linked. Display only — it is not what authenticates, and
+	// a passkey has none.
+	Email       OptString      `json:"email"`
+	IsPrimary   bool           `json:"isPrimary"`
+	LinkedAt    time.Time      `json:"linkedAt"`
+	LastLoginAt OptNilDateTime `json:"lastLoginAt"`
+}
+
+// GetID returns the value of ID.
+func (s *LinkedProvider) GetID() uuid.UUID {
+	return s.ID
+}
+
+// GetKind returns the value of Kind.
+func (s *LinkedProvider) GetKind() AuthProviderKind {
+	return s.Kind
+}
+
+// GetEmail returns the value of Email.
+func (s *LinkedProvider) GetEmail() OptString {
+	return s.Email
+}
+
+// GetIsPrimary returns the value of IsPrimary.
+func (s *LinkedProvider) GetIsPrimary() bool {
+	return s.IsPrimary
+}
+
+// GetLinkedAt returns the value of LinkedAt.
+func (s *LinkedProvider) GetLinkedAt() time.Time {
+	return s.LinkedAt
+}
+
+// GetLastLoginAt returns the value of LastLoginAt.
+func (s *LinkedProvider) GetLastLoginAt() OptNilDateTime {
+	return s.LastLoginAt
+}
+
+// SetID sets the value of ID.
+func (s *LinkedProvider) SetID(val uuid.UUID) {
+	s.ID = val
+}
+
+// SetKind sets the value of Kind.
+func (s *LinkedProvider) SetKind(val AuthProviderKind) {
+	s.Kind = val
+}
+
+// SetEmail sets the value of Email.
+func (s *LinkedProvider) SetEmail(val OptString) {
+	s.Email = val
+}
+
+// SetIsPrimary sets the value of IsPrimary.
+func (s *LinkedProvider) SetIsPrimary(val bool) {
+	s.IsPrimary = val
+}
+
+// SetLinkedAt sets the value of LinkedAt.
+func (s *LinkedProvider) SetLinkedAt(val time.Time) {
+	s.LinkedAt = val
+}
+
+// SetLastLoginAt sets the value of LastLoginAt.
+func (s *LinkedProvider) SetLastLoginAt(val OptNilDateTime) {
+	s.LastLoginAt = val
+}
+
+// Ref: #/components/schemas/LinkedProviderList
+type LinkedProviderList struct {
+	Items []LinkedProvider `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *LinkedProviderList) GetItems() []LinkedProvider {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *LinkedProviderList) SetItems(val []LinkedProvider) {
+	s.Items = val
+}
+
+func (*LinkedProviderList) listAuthProvidersRes() {}
+
+// Ref: #/components/schemas/LoginRequest
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// GetEmail returns the value of Email.
+func (s *LoginRequest) GetEmail() string {
+	return s.Email
+}
+
+// GetPassword returns the value of Password.
+func (s *LoginRequest) GetPassword() string {
+	return s.Password
+}
+
+// SetEmail sets the value of Email.
+func (s *LoginRequest) SetEmail(val string) {
+	s.Email = val
+}
+
+// SetPassword sets the value of Password.
+func (s *LoginRequest) SetPassword(val string) {
+	s.Password = val
 }
 
 // NewOptAssignedBy returns new OptAssignedBy with value set to v.
@@ -543,6 +843,52 @@ func (o OptAssignedBy) Get() (v AssignedBy, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAssignedBy) Or(d AssignedBy) AssignedBy {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAuthProviderKind returns new OptAuthProviderKind with value set to v.
+func NewOptAuthProviderKind(v AuthProviderKind) OptAuthProviderKind {
+	return OptAuthProviderKind{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthProviderKind is optional AuthProviderKind.
+type OptAuthProviderKind struct {
+	Value AuthProviderKind
+	Set   bool
+}
+
+// IsSet returns true if OptAuthProviderKind was set.
+func (o OptAuthProviderKind) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthProviderKind) Reset() {
+	var v AuthProviderKind
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthProviderKind) SetTo(v AuthProviderKind) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthProviderKind) Get() (v AuthProviderKind, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthProviderKind) Or(d AuthProviderKind) AuthProviderKind {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -727,6 +1073,52 @@ func (o OptFloat64) Get() (v float64, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFloat64) Or(d float64) float64 {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInt returns new OptInt with value set to v.
+func NewOptInt(v int) OptInt {
+	return OptInt{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInt is optional int.
+type OptInt struct {
+	Value int
+	Set   bool
+}
+
+// IsSet returns true if OptInt was set.
+func (o OptInt) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInt) Reset() {
+	var v int
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInt) SetTo(v int) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInt) Get() (v int, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInt) Or(d int) int {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -1075,6 +1467,45 @@ func (o OptUUID) Or(d uuid.UUID) uuid.UUID {
 	return d
 }
 
+// Ref: #/components/schemas/RegisterRequest
+type RegisterRequest struct {
+	Email string `json:"email"`
+	// Length is the only rule the contract enforces. Composition rules push people towards predictable
+	// substitutions; length does not.
+	Password    string `json:"password"`
+	DisplayName string `json:"displayName"`
+}
+
+// GetEmail returns the value of Email.
+func (s *RegisterRequest) GetEmail() string {
+	return s.Email
+}
+
+// GetPassword returns the value of Password.
+func (s *RegisterRequest) GetPassword() string {
+	return s.Password
+}
+
+// GetDisplayName returns the value of DisplayName.
+func (s *RegisterRequest) GetDisplayName() string {
+	return s.DisplayName
+}
+
+// SetEmail sets the value of Email.
+func (s *RegisterRequest) SetEmail(val string) {
+	s.Email = val
+}
+
+// SetPassword sets the value of Password.
+func (s *RegisterRequest) SetPassword(val string) {
+	s.Password = val
+}
+
+// SetDisplayName sets the value of DisplayName.
+func (s *RegisterRequest) SetDisplayName(val string) {
+	s.DisplayName = val
+}
+
 // How complete this source can be assumed to be. Only `official` may be presented as the whole
 // picture.
 // Ref: #/components/schemas/Reliability
@@ -1125,6 +1556,174 @@ func (s *Reliability) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// RevokeSessionNoContent is response for RevokeSession operation.
+type RevokeSessionNoContent struct{}
+
+func (*RevokeSessionNoContent) revokeSessionRes() {}
+
+type RevokeSessionNotFound ErrorEnvelope
+
+func (*RevokeSessionNotFound) revokeSessionRes() {}
+
+type RevokeSessionUnauthorized ErrorEnvelope
+
+func (*RevokeSessionUnauthorized) revokeSessionRes() {}
+
+// A browser that is signed in. The token itself never appears here — only the server-side record of
+// it.
+// Ref: #/components/schemas/Session
+type Session struct {
+	ID           uuid.UUID           `json:"id"`
+	ProviderKind OptAuthProviderKind `json:"providerKind"`
+	IssuedAt     time.Time           `json:"issuedAt"`
+	LastSeenAt   time.Time           `json:"lastSeenAt"`
+	ExpiresAt    time.Time           `json:"expiresAt"`
+	// Enough to recognise which browser this is, and revoke the right one.
+	UserAgent OptString    `json:"userAgent"`
+	IP        OptNilString `json:"ip"`
+	// True for the session making this request.
+	IsCurrent bool `json:"isCurrent"`
+}
+
+// GetID returns the value of ID.
+func (s *Session) GetID() uuid.UUID {
+	return s.ID
+}
+
+// GetProviderKind returns the value of ProviderKind.
+func (s *Session) GetProviderKind() OptAuthProviderKind {
+	return s.ProviderKind
+}
+
+// GetIssuedAt returns the value of IssuedAt.
+func (s *Session) GetIssuedAt() time.Time {
+	return s.IssuedAt
+}
+
+// GetLastSeenAt returns the value of LastSeenAt.
+func (s *Session) GetLastSeenAt() time.Time {
+	return s.LastSeenAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *Session) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetUserAgent returns the value of UserAgent.
+func (s *Session) GetUserAgent() OptString {
+	return s.UserAgent
+}
+
+// GetIP returns the value of IP.
+func (s *Session) GetIP() OptNilString {
+	return s.IP
+}
+
+// GetIsCurrent returns the value of IsCurrent.
+func (s *Session) GetIsCurrent() bool {
+	return s.IsCurrent
+}
+
+// SetID sets the value of ID.
+func (s *Session) SetID(val uuid.UUID) {
+	s.ID = val
+}
+
+// SetProviderKind sets the value of ProviderKind.
+func (s *Session) SetProviderKind(val OptAuthProviderKind) {
+	s.ProviderKind = val
+}
+
+// SetIssuedAt sets the value of IssuedAt.
+func (s *Session) SetIssuedAt(val time.Time) {
+	s.IssuedAt = val
+}
+
+// SetLastSeenAt sets the value of LastSeenAt.
+func (s *Session) SetLastSeenAt(val time.Time) {
+	s.LastSeenAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *Session) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetUserAgent sets the value of UserAgent.
+func (s *Session) SetUserAgent(val OptString) {
+	s.UserAgent = val
+}
+
+// SetIP sets the value of IP.
+func (s *Session) SetIP(val OptNilString) {
+	s.IP = val
+}
+
+// SetIsCurrent sets the value of IsCurrent.
+func (s *Session) SetIsCurrent(val bool) {
+	s.IsCurrent = val
+}
+
+type SessionCookie struct {
+	APIKey string
+	Roles  []string
+}
+
+// GetAPIKey returns the value of APIKey.
+func (s *SessionCookie) GetAPIKey() string {
+	return s.APIKey
+}
+
+// GetRoles returns the value of Roles.
+func (s *SessionCookie) GetRoles() []string {
+	return s.Roles
+}
+
+// SetAPIKey sets the value of APIKey.
+func (s *SessionCookie) SetAPIKey(val string) {
+	s.APIKey = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *SessionCookie) SetRoles(val []string) {
+	s.Roles = val
+}
+
+// Ref: #/components/schemas/SessionList
+type SessionList struct {
+	Items []Session `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *SessionList) GetItems() []Session {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *SessionList) SetItems(val []Session) {
+	s.Items = val
+}
+
+func (*SessionList) listSessionsRes() {}
+
+// SignOutNoContent is response for SignOut operation.
+type SignOutNoContent struct {
+	SetCookie OptString
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *SignOutNoContent) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *SignOutNoContent) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
+
+func (*SignOutNoContent) signOutRes() {}
 
 // A signal as the timeline shows it. `payload` is deliberately absent: the raw item stays in the
 // database.
@@ -1328,3 +1927,97 @@ func (s *SignalList) GetItems() []Signal {
 func (s *SignalList) SetItems(val []Signal) {
 	s.Items = val
 }
+
+// Ref: #/components/schemas/SignedInUser
+type SignedInUser struct {
+	ID uuid.UUID `json:"id"`
+	// The canonical address the owner declares. Not what authenticates them — sign-in matches on the
+	// provider's immutable subject.
+	Email       string `json:"email"`
+	DisplayName string `json:"displayName"`
+	// Presentation only. Everything is stored and returned in UTC.
+	Timezone string `json:"timezone"`
+}
+
+// GetID returns the value of ID.
+func (s *SignedInUser) GetID() uuid.UUID {
+	return s.ID
+}
+
+// GetEmail returns the value of Email.
+func (s *SignedInUser) GetEmail() string {
+	return s.Email
+}
+
+// GetDisplayName returns the value of DisplayName.
+func (s *SignedInUser) GetDisplayName() string {
+	return s.DisplayName
+}
+
+// GetTimezone returns the value of Timezone.
+func (s *SignedInUser) GetTimezone() string {
+	return s.Timezone
+}
+
+// SetID sets the value of ID.
+func (s *SignedInUser) SetID(val uuid.UUID) {
+	s.ID = val
+}
+
+// SetEmail sets the value of Email.
+func (s *SignedInUser) SetEmail(val string) {
+	s.Email = val
+}
+
+// SetDisplayName sets the value of DisplayName.
+func (s *SignedInUser) SetDisplayName(val string) {
+	s.DisplayName = val
+}
+
+// SetTimezone sets the value of Timezone.
+func (s *SignedInUser) SetTimezone(val string) {
+	s.Timezone = val
+}
+
+// StartGoogleSignInFound is response for StartGoogleSignIn operation.
+type StartGoogleSignInFound struct {
+	Location  string
+	SetCookie OptString
+}
+
+// GetLocation returns the value of Location.
+func (s *StartGoogleSignInFound) GetLocation() string {
+	return s.Location
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *StartGoogleSignInFound) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// SetLocation sets the value of Location.
+func (s *StartGoogleSignInFound) SetLocation(val string) {
+	s.Location = val
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *StartGoogleSignInFound) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
+
+type UnlinkAuthProviderConflict ErrorEnvelope
+
+func (*UnlinkAuthProviderConflict) unlinkAuthProviderRes() {}
+
+// UnlinkAuthProviderNoContent is response for UnlinkAuthProvider operation.
+type UnlinkAuthProviderNoContent struct{}
+
+func (*UnlinkAuthProviderNoContent) unlinkAuthProviderRes() {}
+
+type UnlinkAuthProviderNotFound ErrorEnvelope
+
+func (*UnlinkAuthProviderNotFound) unlinkAuthProviderRes() {}
+
+type UnlinkAuthProviderUnauthorized ErrorEnvelope
+
+func (*UnlinkAuthProviderUnauthorized) unlinkAuthProviderRes() {}

@@ -9,7 +9,13 @@
  */
 
 import { minutesBetween, ownerDayKey } from "@/lib/format"
-import { commitments, events, personById, tasks } from "@/lib/mock/data"
+import {
+  commitments as seedCommitments,
+  events as seedEvents,
+  personById,
+  tasks as seedTasks,
+} from "@/lib/mock/data"
+import type { Commitment, Task, WorkEvent } from "@/lib/mock/types"
 
 export type ScheduleKind = "event" | "task" | "commitment"
 
@@ -28,7 +34,15 @@ export interface ScheduleEntry {
 /** Minutes a point-in-time entry occupies in a day column, so it stays clickable. */
 export const POINT_ENTRY_MINUTES = 30
 
-export function scheduleEntries(): ScheduleEntry[] {
+export function scheduleEntries({
+  events = seedEvents,
+  tasks = seedTasks,
+  commitments = seedCommitments,
+}: {
+  events?: WorkEvent[]
+  tasks?: Task[]
+  commitments?: Commitment[]
+} = {}): ScheduleEntry[] {
   const fromEvents: ScheduleEntry[] = events
     .filter((event) => event.status !== "cancelled")
     .map((event) => ({

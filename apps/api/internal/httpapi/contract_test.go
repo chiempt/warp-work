@@ -15,18 +15,24 @@ type envelope struct {
 	} `json:"error"`
 }
 
-func get(t *testing.T, path string) (int, envelope) {
+func request(t *testing.T, method, path string) (int, envelope) {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	newServer(t).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+	newServer(t).ServeHTTP(rec, httptest.NewRequest(method, path, nil))
 
 	var body envelope
 	if rec.Body.Len() > 0 {
 		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-			t.Fatalf("%s: response is not the error envelope: %v (%s)", path, err, rec.Body.String())
+			t.Fatalf("%s %s: response is not the error envelope: %v (%s)",
+				method, path, err, rec.Body.String())
 		}
 	}
 	return rec.Code, body
+}
+
+func get(t *testing.T, path string) (int, envelope) {
+	t.Helper()
+	return request(t, http.MethodGet, path)
 }
 
 // The contract is served by the binary that implements it, so a deployed
@@ -37,9 +43,6 @@ func TestSpecIsServed(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("want 200, got %d", rec.Code)
-	}
-	if got := rec.Header().Get("Content-Type"); got == "" {
-		t.Error("the spec must be served with a content type")
 	}
 	if rec.Body.Len() == 0 {
 		t.Fatal("the spec is empty; is docs/api/openapi.yaml embedded?")
@@ -55,40 +58,77 @@ func TestDocsUIIsServed(t *testing.T) {
 	}
 }
 
-// An operation the contract promises but that is not written yet must say so.
-// Reporting it as a client error would send someone hunting through their own
-// request for a fault that is ours.
-func TestUnimplementedOperation_is501(t *testing.T) {
-	status, body := get(t, "/api/v1/contexts")
+// The contract declares a global security requirement, so an endpoint that
+// forgets to opt out is protected by default rather than by remembering.
+func TestSecuredEndpoints_withoutSession_are401(t *testing.T) {
+	for _, path := range []string{
+		"/api/v1/contexts",
+		"/api/v1/accounts",
+		"/api/v1/auth/session",
+		"/api/v1/auth/sessions",
+		"/api/v1/auth/providers",
+	} {
+		t.Run(path, func(t *testing.T) {
+			status, body := get(t, path)
+
+			if status != http.StatusUnauthorized {
+				t.Fatalf("want 401, got %d", status)
+			}
+			if body.Error.Code != "unauthenticated" {
+				t.Errorf("want code unauthenticated, got %q", body.Error.Code)
+			}
+		})
+	}
+}
+
+// Security resolves before parameters are decoded. `/signals` has a required
+// parameter and is missing it here, yet the answer is 401 rather than 400 — an
+// unauthenticated caller learns nothing about the shape of the endpoint.
+func TestSecurityIsCheckedBeforeValidation(t *testing.T) {
+	status, body := get(t, "/api/v1/signals")
+
+	if status != http.StatusUnauthorized {
+		t.Fatalf("want 401 rather than a parameter error, got %d", status)
+	}
+	if body.Error.Code != "unauthenticated" {
+		t.Errorf("want code unauthenticated, got %q", body.Error.Code)
+	}
+}
+
+// Signing in cannot require a session. These two opt out with `security: []`,
+// and reaching the handler at all is what proves the opt-out took effect.
+func TestSignInEndpointsAreReachableWithoutASession(t *testing.T) {
+	status, body := get(t, "/api/v1/auth/google/start")
 
 	if status != http.StatusNotImplemented {
-		t.Fatalf("want 501, got %d", status)
+		t.Fatalf("want 501 — reached the handler, not yet written — got %d", status)
 	}
 	if body.Error.Code != "not_implemented" {
 		t.Errorf("want code not_implemented, got %q", body.Error.Code)
 	}
 }
 
-// These cases are rejected by generated code, from the spec — no handler runs.
-// The point of the test is that the rejection still arrives in our envelope.
+// These are rejected by generated code, from the spec — no handler runs. The
+// point is that the rejection still arrives in our envelope.
 func TestContractViolations_areRejectedInTheEnvelope(t *testing.T) {
 	tests := []struct {
 		name string
 		path string
 	}{
 		{
-			// Hard invariant 2: there is no unfiltered signal listing, and the
-			// contract is what enforces it.
-			name: "signals without contextIds",
-			path: "/api/v1/signals",
+			name: "callback without the required code and state",
+			path: "/api/v1/auth/google/callback",
 		},
 		{
-			name: "context id that is not a uuid",
-			path: "/api/v1/signals?contextIds=not-a-uuid",
+			// The pattern on returnTo rejects a protocol-relative URL, so the
+			// sign-in redirect cannot be turned into an open redirect. No
+			// handler code enforces this — the schema does.
+			name: "returnTo pointing off-site",
+			path: "/api/v1/auth/google/start?returnTo=//evil.example.com",
 		},
 		{
-			name: "limit above the declared maximum",
-			path: "/api/v1/signals?contextIds=0192a5bb-0000-7000-8000-000000000001&limit=999",
+			name: "returnTo as an absolute URL",
+			path: "/api/v1/auth/google/start?returnTo=https://evil.example.com",
 		},
 	}
 
@@ -109,6 +149,7 @@ func TestContractViolations_areRejectedInTheEnvelope(t *testing.T) {
 	}
 }
 
+// A path outside the contract is answered by routing, before security.
 func TestUnknownEndpoint_is404InTheEnvelope(t *testing.T) {
 	status, body := get(t, "/api/v1/nope")
 

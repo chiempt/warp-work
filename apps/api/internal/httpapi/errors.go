@@ -120,6 +120,8 @@ func translate(err error) (int, Error) {
 
 func codeForStatus(status int) string {
 	switch status {
+	case http.StatusUnauthorized:
+		return "unauthenticated"
 	case http.StatusNotFound:
 		return "not_found"
 	case http.StatusBadRequest:

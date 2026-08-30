@@ -458,8 +458,20 @@ Decided 2026-08-30 while building the first UI pass. The full component mapping 
 Seven routes, and no more without a reason: `/login`, `/` (dashboard), `/work-items`,
 `/schedule`, `/audit-log`, `/reports`, `/settings` (contexts, connections, autonomy).
 
+- **Extraction is the main path in, not the only one.** Tasks and commitments can be
+  created and edited by hand: `tasks.source_signal_id` is nullable, every context has to
+  stay usable on `manual` sources alone (§4), and status, due date and priority are
+  mutable columns by design. A promise made on a phone call leaves no signal, and losing
+  it is worse than recording it. What manual entry never does is pretend to be derived —
+  a hand-written task shows no source signal, a hand-recorded commitment reads *recorded
+  by hand*, and neither is touched by re-running extraction.
 - **Tasks and commitments share one screen; events anchor Schedule.** All three are
   derived work items, but events are read against a clock, not scanned as a list.
+- **A calendar write is an outbound action.** An event carrying an `external_calendar_id`
+  exists on a calendar other people read, so changing it changes something outside Warp
+  and goes through `proposed_actions` like a drafted email. Events with no external id are
+  local and save directly. Sync is one-directional and incremental — Warp pulls what
+  changed since its stored token and never offers a full re-fetch.
 - **Schedule has two modes, because there are two questions.** *Agenda* answers "what is
   coming" — one clock, in order, over a seven-day horizon; it stays the default. *Calendar*
   answers "where does this fit" — a week or month grid with duration and free space drawn
@@ -469,8 +481,16 @@ Seven routes, and no more without a reason: `/login`, `/` (dashboard), `/work-it
 - **The dashboard is the review queue.** Approving is the most frequent action in the
   product, so it is on the first screen, keyboard-driven (`j`/`k`/`e`/`a`/`r`), and
   confirmed through `AlertDialog` naming the recipient.
-- **Login is a lock, not a front door.** Single user: no sign-up, no social login, no
-  emailed reset link. Each of those is a second way in to other people's correspondence.
+- **Two ways in, one account.** Google is the primary path: Warp already holds a Google
+  grant for Gmail, Calendar and Drive, so signing in with that account reuses an identity
+  the system depends on rather than adding a second one. It is pinned to the owner's
+  `sub` and refuses every other Google account — that pin is what keeps it single-user. A
+  passphrase is the fallback for when Google is down or the grant has lapsed, and there is
+  still no emailed reset link: a lost passphrase is recovered on the server, by the owner.
+- **Registration creates the owner, once.** `/register` provisions the single row every
+  `user_id` column points at, and the API closes the route as soon as that row exists. A
+  single-user system with an open registration endpoint is a multi-user system nobody
+  meant to build.
 - **Motion never gates content.** ADR 0006 allows Magic UI at clock-in, clock-out, the
   report, and empty states. A count-up on the dashboard stats and a staged reveal on the
   signal feed were both built and then removed — a surface read every morning must not be

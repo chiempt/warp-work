@@ -29,10 +29,12 @@ export function ScheduleMonth({
   anchor,
   entries,
   now,
+  onSelect,
 }: {
   anchor: string
   entries: ScheduleEntry[]
   now: string
+  onSelect: (entry: ScheduleEntry) => void
 }) {
   const cells = monthGrid(anchor)
   const grouped = byDay(entries)
@@ -83,7 +85,11 @@ export function ScheduleMonth({
 
               <div className="space-y-0.5">
                 {shown.map((entry) => (
-                  <MonthEntry key={`${entry.kind}-${entry.id}`} entry={entry} />
+                  <MonthEntry
+                    key={`${entry.kind}-${entry.id}`}
+                    entry={entry}
+                    onSelect={onSelect}
+                  />
                 ))}
                 {hidden > 0 ? (
                   <p className="pl-1 text-[10px] text-muted-foreground">
@@ -101,7 +107,13 @@ export function ScheduleMonth({
   )
 }
 
-function MonthEntry({ entry }: { entry: ScheduleEntry }) {
+function MonthEntry({
+  entry,
+  onSelect,
+}: {
+  entry: ScheduleEntry
+  onSelect: (entry: ScheduleEntry) => void
+}) {
   const context = contextById.get(entry.contextId)
   const derived = entry.kind !== "event"
 
@@ -109,7 +121,11 @@ function MonthEntry({ entry }: { entry: ScheduleEntry }) {
     <Tooltip>
       <TooltipTrigger
         render={
-          <div className="flex w-full items-center gap-1 rounded px-1 py-px text-left hover:bg-muted">
+          <button
+            type="button"
+            onClick={() => onSelect(entry)}
+            className="flex w-full cursor-pointer items-center gap-1 rounded px-1 py-px text-left hover:bg-muted"
+          >
             {/* Filled for a calendar event, hollow for a date Warp derived — the same
                 distinction the week grid draws with a dashed border. */}
             <span
@@ -124,7 +140,7 @@ function MonthEntry({ entry }: { entry: ScheduleEntry }) {
               {formatTime(entry.startAt)}
             </span>
             <span className="truncate text-[11px]">{entry.title}</span>
-          </div>
+          </button>
         }
       />
       <TooltipContent className="max-w-64 space-y-0.5">

@@ -35,10 +35,12 @@ export function ScheduleWeek({
   weekStart,
   entries,
   now,
+  onSelect,
 }: {
   weekStart: string
   entries: ScheduleEntry[]
   now: string
+  onSelect: (entry: ScheduleEntry) => void
 }) {
   const scroller = React.useRef<HTMLDivElement>(null)
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -138,6 +140,7 @@ export function ScheduleWeek({
                     lane={lane}
                     lanes={lanes}
                     now={now}
+                    onSelect={onSelect}
                   />
                 ))}
               </div>
@@ -156,11 +159,13 @@ function EntryBlock({
   lane,
   lanes,
   now,
+  onSelect,
 }: {
   entry: ScheduleEntry
   lane: number
   lanes: number
   now: string
+  onSelect: (entry: ScheduleEntry) => void
 }) {
   const tone = contextTone(entry.contextId)
   const start = ownerMinutes(entry.startAt)
@@ -177,9 +182,11 @@ function EntryBlock({
     <Tooltip>
       <TooltipTrigger
         render={
-          <div
+          <button
+            type="button"
+            onClick={() => onSelect(entry)}
             className={cn(
-              "absolute z-10 overflow-hidden rounded-md border-l-2 px-1.5 py-1 text-left",
+              "absolute z-10 cursor-pointer overflow-hidden rounded-md border-l-2 px-1.5 py-1 text-left hover:brightness-110",
               tone.block,
               tone.edge,
               derived && "border border-dashed border-l-2 bg-transparent",
@@ -202,7 +209,7 @@ function EntryBlock({
                 {entry.endAt ? `–${formatTime(entry.endAt)}` : ""}
               </p>
             ) : null}
-          </div>
+          </button>
         }
       />
       <TooltipContent className="max-w-64 space-y-0.5">

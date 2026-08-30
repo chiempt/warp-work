@@ -10,6 +10,30 @@
  * vendor, and it is the one source every context is guaranteed to have.
  */
 
+/** The Google "G", for the OAuth button. One grant covers sign-in and the connectors. */
+export function GoogleMark() {
+  return (
+    <svg viewBox="0 0 24 24" role="img" aria-label="Google" className="size-full">
+      <path
+        fill="#4285F4"
+        d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.54 5.54 0 0 1-2.4 3.64v3.02h3.89c2.27-2.09 3.58-5.17 3.58-8.9z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.89-3.02c-1.08.72-2.45 1.16-4.04 1.16-3.11 0-5.75-2.1-6.69-4.93H1.29v3.09A11.99 11.99 0 0 0 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.31 14.3c-.24-.72-.38-1.49-.38-2.3s.14-1.58.38-2.3V6.61H1.29A11.99 11.99 0 0 0 0 12c0 1.94.46 3.77 1.29 5.39l4.02-3.09z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.77c1.76 0 3.33.61 4.57 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.29 6.61l4.02 3.09C6.25 6.87 8.89 4.77 12 4.77z"
+      />
+    </svg>
+  )
+}
+
 export function GmailMark() {
   return (
     <svg viewBox="0 0 24 24" role="img" aria-label="Gmail" className="size-full">

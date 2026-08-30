@@ -21,7 +21,9 @@ export function CommitmentRow({
   showStatus?: boolean
 }) {
   const person = personById.get(commitment.personId)
-  const evidence = signalById.get(commitment.evidenceSignalId)
+  const evidence = commitment.evidenceSignalId
+    ? signalById.get(commitment.evidenceSignalId)
+    : undefined
   const late = commitment.status === "open" && isOverdue(commitment.dueAt, NOW)
 
   return (
@@ -53,7 +55,11 @@ export function CommitmentRow({
                 </p>
               </TooltipContent>
             </Tooltip>
-          ) : null}
+          ) : (
+            // A promise with nothing behind it is still worth keeping — it just has to
+            // look different from one a signal proves.
+            <span className="text-muted-foreground/80 italic">recorded by hand</span>
+          )}
           {showStatus ? <CommitmentStatusBadge status={commitment.status} /> : null}
         </div>
       </div>

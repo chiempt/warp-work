@@ -61,6 +61,7 @@ func (s *Server) routes() error {
 	// here; they are declared in the spec.
 	apiServer, err := api.NewServer(
 		NewHandler(s.logger, s.pool),
+		securityHandler{},
 		api.WithErrorHandler(ogenErrorHandler(s.logger)),
 		api.WithNotFound(notFoundHandler),
 		api.WithMethodNotAllowed(methodNotAllowedHandler),

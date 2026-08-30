@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	ht "github.com/ogen-go/ogen/http"
+	"github.com/ogen-go/ogen/ogenerrors"
 
 	"github.com/chiempham/warp-work/apps/api/internal/api"
 	"github.com/chiempham/warp-work/internal/domain"
@@ -57,14 +58,35 @@ func (h *Handler) NewError(ctx context.Context, err error) *api.ErrorStatusCode 
 	}
 }
 
+// ogenRejection is anything ogen refused with a status of its own: a security
+// scheme that did not resolve, a parameter that failed the schema. Taking its
+// status keeps the response and the contract agreeing without a mapping table
+// that has to be kept in step by hand.
+type ogenRejection interface {
+	error
+	Code() int
+}
+
 // classify maps a Go error onto a status and a stable machine-readable code.
+//
+// Both error paths funnel through here — the one ogen uses for handler errors
+// and security failures, and the one it uses for requests it rejected before
+// an operation — so the API cannot answer the same condition two ways.
 func classify(err error) (status int, code, message string) {
 	var apiErr *APIError
 	if errors.As(err, &apiErr) {
 		return apiErr.Status, apiErr.Code, apiErr.Message
 	}
 
-	// An operation that is in the spec but not yet written.
+	// No session, or one this server refused. Named before the generic ogen
+	// case so the message can point at how to get one.
+	if errors.Is(err, ErrNoSession) || isSecurityError(err) {
+		return http.StatusUnauthorized, "unauthenticated",
+			"this endpoint requires a session; sign in at /api/v1/auth/google/start"
+	}
+
+	// Described by the contract, not written yet. A promise the API has
+	// published and not yet kept — never reported as the caller's mistake.
 	if errors.Is(err, ht.ErrNotImplemented) {
 		return http.StatusNotImplemented, "not_implemented",
 			"this operation is described by the API contract but is not implemented yet"
@@ -75,39 +97,43 @@ func classify(err error) (status int, code, message string) {
 		return http.StatusUnprocessableEntity, "invalid", err.Error()
 	}
 
+	// Rejected against the spec: a missing required parameter, a malformed
+	// uuid, a value outside its declared range. The message names the
+	// parameter and is safe to return.
+	var rejected ogenRejection
+	if errors.As(err, &rejected) {
+		return rejected.Code(), codeForStatus(rejected.Code()), rejected.Error()
+	}
+
 	// Anything unrecognised is a bug. Say nothing specific.
 	return http.StatusInternalServerError, "internal", "internal error"
 }
 
+// isSecurityError reports whether ogen failed while resolving a security
+// scheme — no cookie at all, or one securityHandler refused.
+func isSecurityError(err error) bool {
+	var secErr *ogenerrors.SecurityError
+	return errors.As(err, &secErr)
+}
+
 // ogenErrorHandler answers requests that never reached an operation, plus the
-// one case ogen deliberately routes here instead of to NewError: an operation
-// that returns ht.ErrNotImplemented.
-//
-// Both still have to leave as the same envelope, or a client would need a
-// second error branch for exactly these paths.
+// cases ogen deliberately routes here rather than to NewError.
 func ogenErrorHandler(logger *slog.Logger) func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
-		// Described by the contract, not written yet. This is a promise the
-		// API has published and not yet kept, so it must not be reported as a
-		// client mistake.
-		if errors.Is(err, ht.ErrNotImplemented) {
-			writeEnvelope(w, http.StatusNotImplemented, "not_implemented",
-				"this operation is described by the API contract but is not implemented yet")
-			return
-		}
+		status, code, message := classify(err)
 
-		// Otherwise ogen rejected the request against the spec before it became
-		// an operation: a missing required parameter, a malformed uuid, a value
-		// outside its declared range. The message names the parameter and is
-		// safe to return.
-		//
-		// Logged at debug on purpose: a scanner probing the API must not be
-		// able to fill the log at warn.
-		logger.DebugContext(ctx, "request rejected against the contract",
+		// Logged at debug when it is the caller's problem: a scanner probing
+		// the API must not be able to fill the log at warn.
+		level := slog.LevelDebug
+		if status >= http.StatusInternalServerError {
+			level = slog.LevelError
+		}
+		logger.Log(ctx, level, "request rejected before handling",
 			slog.String("path", r.URL.Path),
+			slog.Int("status", status),
 			slog.String("error", err.Error()))
 
-		writeEnvelope(w, http.StatusBadRequest, "bad_request", err.Error())
+		writeEnvelope(w, status, code, message)
 	}
 }
 

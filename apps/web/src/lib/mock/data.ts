@@ -375,6 +375,8 @@ export const tasks: Task[] = [
   },
 ]
 
+const PRIMARY_CALENDAR = "chiem.personal@gmail.com"
+
 export const events: WorkEvent[] = [
   {
     id: "evt-01",
@@ -386,6 +388,7 @@ export const events: WorkEvent[] = [
     status: "confirmed",
     personId: "p-hanh",
     sourceSignalId: "sig-04",
+    externalCalendarId: PRIMARY_CALENDAR,
   },
   {
     id: "evt-02",
@@ -397,6 +400,7 @@ export const events: WorkEvent[] = [
     status: "confirmed",
     personId: "p-duc",
     sourceSignalId: null,
+    externalCalendarId: PRIMARY_CALENDAR,
   },
   {
     id: "evt-03",
@@ -408,6 +412,7 @@ export const events: WorkEvent[] = [
     status: "confirmed",
     personId: "p-marcus",
     sourceSignalId: null,
+    externalCalendarId: PRIMARY_CALENDAR,
   },
   {
     id: "evt-04",
@@ -419,6 +424,7 @@ export const events: WorkEvent[] = [
     status: "tentative",
     personId: null,
     sourceSignalId: null,
+    externalCalendarId: null,
   },
   {
     id: "evt-05",
@@ -430,6 +436,7 @@ export const events: WorkEvent[] = [
     status: "confirmed",
     personId: "p-hanh",
     sourceSignalId: "sig-01",
+    externalCalendarId: PRIMARY_CALENDAR,
   },
   {
     id: "evt-06",
@@ -441,6 +448,7 @@ export const events: WorkEvent[] = [
     status: "confirmed",
     personId: "p-priya",
     sourceSignalId: null,
+    externalCalendarId: PRIMARY_CALENDAR,
   },
   {
     id: "evt-07",
@@ -452,6 +460,7 @@ export const events: WorkEvent[] = [
     status: "tentative",
     personId: "p-supervisor",
     sourceSignalId: "sig-06",
+    externalCalendarId: PRIMARY_CALENDAR,
   },
 ]
 
@@ -817,3 +826,36 @@ export const contextById = new Map(contexts.map((c) => [c.id, c]))
 export const accountById = new Map(accounts.map((a) => [a.id, a]))
 export const personById = new Map(people.map((p) => [p.id, p]))
 export const signalById = new Map(signals.map((s) => [s.id, s]))
+
+/**
+ * Waiting on the other side of the sync token — what a delta fetch would bring back.
+ *
+ * Exists so the sync control has something real to do in the UI-only phase. It goes when
+ * the adapter lands; nothing else reads it.
+ */
+export const incomingGoogleEvents: WorkEvent[] = [
+  {
+    id: "evt-08",
+    contextId: "ctx-main",
+    title: "Underwriting workshop",
+    startAt: iso("2026-09-03T02:00:00Z"),
+    endAt: iso("2026-09-03T05:00:00Z"),
+    location: "Training room 2A",
+    status: "confirmed",
+    personId: "p-duc",
+    sourceSignalId: null,
+    externalCalendarId: PRIMARY_CALENDAR,
+  },
+  {
+    id: "evt-09",
+    contextId: "ctx-remote-a",
+    title: "Northbeam quarterly review",
+    startAt: iso("2026-09-04T13:00:00Z"),
+    endAt: iso("2026-09-04T14:00:00Z"),
+    location: "Google Meet",
+    status: "tentative",
+    personId: "p-marcus",
+    sourceSignalId: null,
+    externalCalendarId: PRIMARY_CALENDAR,
+  },
+]
