@@ -1,0 +1,80 @@
+# Containerised Postgres and Redis, for machines that do not run them locally.
+#
+# The expected setup is a local Postgres and Redis — see `make db-create`. Use
+# this file only as the alternative; `make docker-up` starts it. Image versions
+# track what a developer machine runs, because a parity gap between dev and the
+# VPS is exactly the kind of thing that surfaces at deploy time.
+#
+# Bring up the full stack, services included, with:
+#
+#   docker compose -f infra/docker-compose.yml --profile full up -d
+#
+# apps/web is not here: run it with `make run-web`.
+
+name: warp
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: warp
+      POSTGRES_PASSWORD: warp
+      POSTGRES_DB: warp
+      # Warp stores UTC everywhere; the container should not disagree.
+      TZ: UTC
+    ports:
+      # Host port is configurable and does not default to 5432: this machine
+      # already runs other projects' databases there.
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warp -d warp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    profiles: ["full"]
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://warp:warp@postgres:5432/warp?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  worker:
+    profiles: ["full"]
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://warp:warp@postgres:5432/warp?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+volumes:
+  postgres-data:
+  redis-data:

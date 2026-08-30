@@ -1,0 +1,33 @@
+# Environment — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Go
+/bin/
+coverage.out
+*.exe
+*.test
+*.out
+vendor/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local data
+/tmp/
+*.db
+*.sqlite
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
