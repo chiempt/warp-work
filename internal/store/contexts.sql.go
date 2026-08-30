@@ -9,12 +9,11 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createContext = `-- name: CreateContext :one
-INSERT INTO contexts (id, user_id, parent_id, name, kind, active_hours, tone_profile, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+INSERT INTO contexts (id, user_id, parent_id, slug, name, kind, color, active_hours, tone_profile, position)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING id, user_id, parent_id, slug, name, kind, color, active_hours, tone_profile, position, is_archived, created_at, updated_at
 `
 
@@ -22,23 +21,30 @@ type CreateContextParams struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID
 	ParentID    *uuid.UUID
+	Slug        string
 	Name        string
 	Kind        ContextKind
+	Color       *string
 	ActiveHours []byte
 	ToneProfile *string
-	CreatedAt   pgtype.Timestamptz
+	Position    int32
 }
 
+// id is supplied by the application as UUIDv7 rather than taken from the
+// column default, so rows sort by creation time. See docs/conventions.md §3.
+// created_at and updated_at come from defaults and a trigger.
 func (q *Queries) CreateContext(ctx context.Context, arg CreateContextParams) (Context, error) {
 	row := q.db.QueryRow(ctx, createContext,
 		arg.ID,
 		arg.UserID,
 		arg.ParentID,
+		arg.Slug,
 		arg.Name,
 		arg.Kind,
+		arg.Color,
 		arg.ActiveHours,
 		arg.ToneProfile,
-		arg.CreatedAt,
+		arg.Position,
 	)
 	var i Context
 	err := row.Scan(
@@ -88,17 +94,17 @@ const listContexts = `-- name: ListContexts :many
 SELECT id, user_id, parent_id, slug, name, kind, color, active_hours, tone_profile, position, is_archived, created_at, updated_at
 FROM contexts
 WHERE user_id = $1
-  AND (NOT $2::boolean OR NOT is_archived)
-ORDER BY parent_id NULLS FIRST, name
+  AND ($2::boolean OR NOT is_archived)
+ORDER BY position, name
 `
 
 type ListContextsParams struct {
 	UserID          uuid.UUID
-	ExcludeArchived bool
+	IncludeArchived bool
 }
 
 func (q *Queries) ListContexts(ctx context.Context, arg ListContextsParams) ([]Context, error) {
-	rows, err := q.db.Query(ctx, listContexts, arg.UserID, arg.ExcludeArchived)
+	rows, err := q.db.Query(ctx, listContexts, arg.UserID, arg.IncludeArchived)
 	if err != nil {
 		return nil, err
 	}

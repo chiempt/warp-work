@@ -38,6 +38,54 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 	return i, err
 }
 
+const listAccountsDueForSync = `-- name: ListAccountsDueForSync :many
+SELECT id, user_id, provider, reliability, display_name, external_account_id, credentials_enc, scopes, sync_cursor, status, last_sync_at, last_error, created_at, updated_at FROM accounts
+WHERE user_id = $1 AND status = 'active'
+ORDER BY last_sync_at NULLS FIRST
+LIMIT $2
+`
+
+type ListAccountsDueForSyncParams struct {
+	UserID   uuid.UUID
+	RowLimit int32
+}
+
+// ListAccountsDueForSync drives the worker. Never synced comes first.
+func (q *Queries) ListAccountsDueForSync(ctx context.Context, arg ListAccountsDueForSyncParams) ([]Account, error) {
+	rows, err := q.db.Query(ctx, listAccountsDueForSync, arg.UserID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Account{}
+	for rows.Next() {
+		var i Account
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Provider,
+			&i.Reliability,
+			&i.DisplayName,
+			&i.ExternalAccountID,
+			&i.CredentialsEnc,
+			&i.Scopes,
+			&i.SyncCursor,
+			&i.Status,
+			&i.LastSyncAt,
+			&i.LastError,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAccountsForContexts = `-- name: ListAccountsForContexts :many
 SELECT DISTINCT a.id, a.user_id, a.provider, a.reliability, a.display_name, a.external_account_id, a.credentials_enc, a.scopes, a.sync_cursor, a.status, a.last_sync_at, a.last_error, a.created_at, a.updated_at
 FROM accounts a
@@ -83,36 +131,65 @@ func (q *Queries) ListAccountsForContexts(ctx context.Context, contextIds []uuid
 
 const markAccountFailed = `-- name: MarkAccountFailed :exec
 UPDATE accounts
-SET status = 'error', last_error = $2, updated_at = $3
-WHERE id = $1
+SET status = 'error', last_error = $1
+WHERE id = $2
 `
 
 type MarkAccountFailedParams struct {
-	ID        uuid.UUID
-	LastError *string
-	UpdatedAt pgtype.Timestamptz
+	Error     *string
+	AccountID uuid.UUID
 }
 
 // MarkAccountFailed stops the account rather than letting it return partial
 // data: a report must never be silently trusted when a source was down.
 func (q *Queries) MarkAccountFailed(ctx context.Context, arg MarkAccountFailedParams) error {
-	_, err := q.db.Exec(ctx, markAccountFailed, arg.ID, arg.LastError, arg.UpdatedAt)
+	_, err := q.db.Exec(ctx, markAccountFailed, arg.Error, arg.AccountID)
+	return err
+}
+
+const markAccountNeedsReauth = `-- name: MarkAccountNeedsReauth :exec
+UPDATE accounts
+SET status = 'needs_reauth', last_error = $1
+WHERE id = $2
+`
+
+type MarkAccountNeedsReauthParams struct {
+	Error     *string
+	AccountID uuid.UUID
+}
+
+// MarkAccountNeedsReauth is the distinct case where the provider withdrew our
+// delegated access — a revoked grant, a changed password, an expired refresh
+// token. It is not a failure to retry, and it says nothing about whether the
+// owner is signed in: this is Warp's authorization to read Google, not the
+// owner's authentication to Warp.
+func (q *Queries) MarkAccountNeedsReauth(ctx context.Context, arg MarkAccountNeedsReauthParams) error {
+	_, err := q.db.Exec(ctx, markAccountNeedsReauth, arg.Error, arg.AccountID)
 	return err
 }
 
 const markAccountSynced = `-- name: MarkAccountSynced :exec
 UPDATE accounts
-SET status = 'connected', last_sync_at = $2, last_error = '', updated_at = $2
-WHERE id = $1
+SET status       = 'active',
+    sync_cursor  = $1,
+    last_sync_at = $2,
+    last_error   = NULL
+WHERE id = $3
 `
 
 type MarkAccountSyncedParams struct {
-	ID         uuid.UUID
-	LastSyncAt pgtype.Timestamptz
+	SyncCursor []byte
+	SyncedAt   pgtype.Timestamptz
+	AccountID  uuid.UUID
 }
 
-// MarkAccountSynced records a successful delta sync.
+// MarkAccountSynced records a successful delta sync and advances the cursor.
+// The cursor is the whole point: without it the next sync would re-fetch the
+// mailbox, which is a defect rather than a fallback.
+//
+// updated_at is deliberately absent — a trigger sets it, and passing a value
+// here would be silently overwritten.
 func (q *Queries) MarkAccountSynced(ctx context.Context, arg MarkAccountSyncedParams) error {
-	_, err := q.db.Exec(ctx, markAccountSynced, arg.ID, arg.LastSyncAt)
+	_, err := q.db.Exec(ctx, markAccountSynced, arg.SyncCursor, arg.SyncedAt, arg.AccountID)
 	return err
 }

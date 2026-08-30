@@ -12,6 +12,9 @@ import (
 
 type Querier interface {
 	AssignSignalContext(ctx context.Context, arg AssignSignalContextParams) error
+	// id is supplied by the application as UUIDv7 rather than taken from the
+	// column default, so rows sort by creation time. See docs/conventions.md §3.
+	// created_at and updated_at come from defaults and a trigger.
 	CreateContext(ctx context.Context, arg CreateContextParams) (Context, error)
 	GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 	GetContext(ctx context.Context, id uuid.UUID) (Context, error)
@@ -20,6 +23,8 @@ type Querier interface {
 	// the stored rows untouched rather than writing new ones — signals are
 	// immutable, and a database trigger enforces that too.
 	IngestSignal(ctx context.Context, arg IngestSignalParams) (Signal, error)
+	// ListAccountsDueForSync drives the worker. Never synced comes first.
+	ListAccountsDueForSync(ctx context.Context, arg ListAccountsDueForSyncParams) ([]Account, error)
 	ListAccountsForContexts(ctx context.Context, contextIds []uuid.UUID) ([]Account, error)
 	ListActiveRoutingRules(ctx context.Context, userID uuid.UUID) ([]RoutingRule, error)
 	// ListContextTimeline is the read path behind the timeline view. It is
@@ -35,7 +40,18 @@ type Querier interface {
 	// MarkAccountFailed stops the account rather than letting it return partial
 	// data: a report must never be silently trusted when a source was down.
 	MarkAccountFailed(ctx context.Context, arg MarkAccountFailedParams) error
-	// MarkAccountSynced records a successful delta sync.
+	// MarkAccountNeedsReauth is the distinct case where the provider withdrew our
+	// delegated access — a revoked grant, a changed password, an expired refresh
+	// token. It is not a failure to retry, and it says nothing about whether the
+	// owner is signed in: this is Warp's authorization to read Google, not the
+	// owner's authentication to Warp.
+	MarkAccountNeedsReauth(ctx context.Context, arg MarkAccountNeedsReauthParams) error
+	// MarkAccountSynced records a successful delta sync and advances the cursor.
+	// The cursor is the whole point: without it the next sync would re-fetch the
+	// mailbox, which is a defect rather than a fallback.
+	//
+	// updated_at is deliberately absent — a trigger sets it, and passing a value
+	// here would be silently overwritten.
 	MarkAccountSynced(ctx context.Context, arg MarkAccountSyncedParams) error
 	// MarkSignalProcessed sets the only column on a signal that may ever change.
 	MarkSignalProcessed(ctx context.Context, arg MarkSignalProcessedParams) error
