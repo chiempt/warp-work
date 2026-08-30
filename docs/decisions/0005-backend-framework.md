@@ -30,7 +30,7 @@ not relitigated per package:
 | UUIDv7 | `github.com/google/uuid` (`uuid.NewV7`) |
 | Logging | `log/slog`, JSON handler |
 | Claude | `github.com/anthropics/anthropic-sdk-go` |
-| API contract | OpenAPI 3.1 + `oapi-codegen` (Echo server interfaces, TypeScript client) |
+| API contract | OpenAPI 3.0 + [ogen](https://github.com/ogen-go/ogen) (see [ADR 0007](0007-openapi-with-ogen.md)) |
 
 ## Consequences
 
@@ -43,9 +43,8 @@ quietly diverge from it.
 
 **What this makes hard, and the mitigation.** The backend and `apps/web` are now different languages,
 so API types cannot be shared by construction. This is the real cost of choosing Go over TypeScript,
-and it is paid by making the contract explicit: `docs/api/openapi.yaml` is the source of truth, the
-Echo handler interfaces and the frontend's TypeScript client are both generated from it, and a
-handler that does not match the spec fails to compile. Hand-writing either side is a defect.
+and it is paid by making the contract explicit: `docs/api/openapi.yaml` is the source of truth and
+both sides are generated from it. See [ADR 0007](0007-openapi-with-ogen.md) for how.
 
 **What it forecloses.** Nothing in the data model or the phase plan. The router and extractor stay
 pure functions taking a signal and returning a decision, which is as expressible in Go as anywhere.

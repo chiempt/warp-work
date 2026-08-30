@@ -7,8 +7,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/chiempham/warp/internal/domain"
-	"github.com/chiempham/warp/internal/platform/logging"
+	"github.com/chiempham/warp-work/internal/domain"
+	"github.com/chiempham/warp-work/internal/platform/logging"
 )
 
 // Error is the single error shape the API returns, per docs/conventions.md §6.

@@ -1,0 +1,371 @@
+openapi: 3.0.3
+
+info:
+  title: Warp API
+  version: 0.1.0
+  description: |
+    Warp's HTTP API. This document is the source of truth: the Go server
+    interfaces and the frontend's TypeScript client are both generated from it,
+    and a handler that drifts from it fails to compile.
+
+    Two rules from CLAUDE.md are enforced by the contract itself rather than by
+    convention:
+
+    * **Every read is context-scoped.** `GET /signals` requires `contextIds`.
+      There is no way to ask this API for everything at once.
+    * **Raw payloads never leave the system.** A `Signal` carries its subject
+      and snippet, never `payload` — that is other people's correspondence, and
+      the timeline does not need it.
+
+    Scope is Phase 1 (*See*): contexts, accounts, and the signal timeline. Work
+    items, sessions, and proposed actions arrive with later phases.
+  contact:
+    name: Warp
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: contexts
+    description: The life areas everything else hangs from.
+  - name: accounts
+    description: Connected sources of signals.
+  - name: signals
+    description: Immutable items as they arrived from the outside world.
+
+paths:
+  /api/v1/contexts:
+    get:
+      operationId: listContexts
+      tags: [contexts]
+      summary: List contexts
+      description: |
+        Returns the context tree, parents before children, then by position.
+      parameters:
+        - name: includeArchived
+          in: query
+          required: false
+          description: Include archived contexts. Off by default.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: The context tree.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContextList"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/contexts/{contextId}:
+    get:
+      operationId: getContext
+      tags: [contexts]
+      summary: Get one context
+      parameters:
+        - $ref: "#/components/parameters/ContextId"
+      responses:
+        "200":
+          description: The context.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Context"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/accounts:
+    get:
+      operationId: listAccounts
+      tags: [accounts]
+      summary: List connected accounts
+      description: |
+        Every account carries a `reliability` tier. A client must show it
+        wherever it shows data derived from that account: a report generated
+        while a source was failing is never silently trusted.
+      parameters:
+        - name: contextId
+          in: query
+          required: false
+          description: Only accounts feeding this context.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The connected accounts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountList"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/signals:
+    get:
+      operationId: listSignals
+      tags: [signals]
+      summary: The signal timeline for one or more contexts
+      description: |
+        `contextIds` is required. There is deliberately no unfiltered signal
+        listing: a client that could ask for everything would eventually show
+        coursework during a client work session.
+
+        Newest first, by the time the item actually occurred — not the time it
+        was ingested, which is an artefact of when a sync last ran.
+      parameters:
+        - name: contextIds
+          in: query
+          required: true
+          description: One or more context ids. At least one is required.
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 50
+            items:
+              type: string
+              format: uuid
+        - name: before
+          in: query
+          required: false
+          description: Return signals that occurred strictly before this instant.
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: A page of the timeline.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignalList"
+        default:
+          $ref: "#/components/responses/Error"
+
+components:
+  parameters:
+    ContextId:
+      name: contextId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Error:
+      description: The request failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: No such resource.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      description: |
+        Every error this API returns has this shape, so a client has exactly one
+        branch to write.
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/Error"
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable, machine-readable. Safe to switch on.
+          example: not_found
+        message:
+          type: string
+          description: |
+            Human-readable and safe to display. Never contains payload
+            contents, credentials, or anyone's correspondence.
+          example: context not found
+        details:
+          type: object
+          additionalProperties: true
+          description: Structured detail, when there is any that is safe to return.
+
+    ContextKind:
+      type: string
+      enum: [work, study, personal]
+
+    Context:
+      type: object
+      required: [id, slug, name, kind, position, isArchived, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null for a root context. A child inherits its parent's defaults.
+        slug:
+          type: string
+          example: job-a
+        name:
+          type: string
+          example: Remote job A
+        kind:
+          $ref: "#/components/schemas/ContextKind"
+        color:
+          type: string
+          nullable: true
+        toneProfile:
+          type: string
+          description: How the system writes on the owner's behalf in this context.
+        position:
+          type: integer
+          format: int32
+          description: Display order among siblings.
+        isArchived:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ContextList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Context"
+
+    Reliability:
+      type: string
+      description: |
+        How complete this source can be assumed to be. Only `official` may be
+        presented as the whole picture.
+      enum: [official, unofficial, manual]
+
+    AccountStatus:
+      type: string
+      description: The account's health right now, as distinct from its reliability tier.
+      enum: [connected, error, disconnected]
+
+    Account:
+      type: object
+      required: [id, provider, reliability, displayName, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          example: gmail
+        reliability:
+          $ref: "#/components/schemas/Reliability"
+        displayName:
+          type: string
+        status:
+          $ref: "#/components/schemas/AccountStatus"
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastError:
+          type: string
+          description: Empty when healthy. Never contains credentials.
+
+    AccountList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Account"
+
+    SignalKind:
+      type: string
+      enum: [email, message, calendar_event, file]
+
+    AssignedBy:
+      type: string
+      description: What decided this signal's placement, so a misfiling can be traced.
+      enum: [rule, model, manual]
+
+    Signal:
+      type: object
+      description: |
+        A signal as the timeline shows it. `payload` is deliberately absent:
+        the raw item stays in the database.
+      required: [id, accountId, kind, occurredAt, ingestedAt, processed]
+      properties:
+        id:
+          type: string
+          format: uuid
+        accountId:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/SignalKind"
+        subject:
+          type: string
+        snippet:
+          type: string
+          description: A short excerpt, enough to recognise the item in a list.
+        occurredAt:
+          type: string
+          format: date-time
+          description: When the item actually happened, not when it was fetched.
+        ingestedAt:
+          type: string
+          format: date-time
+        processed:
+          type: boolean
+          description: Whether extraction has already run over this signal.
+        contextId:
+          type: string
+          format: uuid
+          description: The context this row was returned under.
+        confidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: How certain the placement is. Always 1 for a rule match.
+        assignedBy:
+          $ref: "#/components/schemas/AssignedBy"
+
+    SignalList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Signal"

@@ -5,63 +5,1492 @@
 package store
 
 import (
+	"database/sql/driver"
+	"fmt"
+	"net/netip"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/pgvector/pgvector-go"
 )
 
+type AccountProvider string
+
+const (
+	AccountProviderGmail             AccountProvider = "gmail"
+	AccountProviderGcalendar         AccountProvider = "gcalendar"
+	AccountProviderGdrive            AccountProvider = "gdrive"
+	AccountProviderZaloOa            AccountProvider = "zalo_oa"
+	AccountProviderFacebookPage      AccountProvider = "facebook_page"
+	AccountProviderInstagramBusiness AccountProvider = "instagram_business"
+	AccountProviderManual            AccountProvider = "manual"
+)
+
+func (e *AccountProvider) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AccountProvider(s)
+	case string:
+		*e = AccountProvider(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AccountProvider: %T", src)
+	}
+	return nil
+}
+
+type NullAccountProvider struct {
+	AccountProvider AccountProvider
+	Valid           bool // Valid is true if AccountProvider is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAccountProvider) Scan(value interface{}) error {
+	if value == nil {
+		ns.AccountProvider, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AccountProvider.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAccountProvider) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AccountProvider), nil
+}
+
+type AccountReliability string
+
+const (
+	AccountReliabilityOfficial   AccountReliability = "official"
+	AccountReliabilityUnofficial AccountReliability = "unofficial"
+	AccountReliabilityManual     AccountReliability = "manual"
+)
+
+func (e *AccountReliability) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AccountReliability(s)
+	case string:
+		*e = AccountReliability(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AccountReliability: %T", src)
+	}
+	return nil
+}
+
+type NullAccountReliability struct {
+	AccountReliability AccountReliability
+	Valid              bool // Valid is true if AccountReliability is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAccountReliability) Scan(value interface{}) error {
+	if value == nil {
+		ns.AccountReliability, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AccountReliability.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAccountReliability) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AccountReliability), nil
+}
+
+type AccountStatus string
+
+const (
+	AccountStatusActive      AccountStatus = "active"
+	AccountStatusNeedsReauth AccountStatus = "needs_reauth"
+	AccountStatusDisabled    AccountStatus = "disabled"
+	AccountStatusError       AccountStatus = "error"
+)
+
+func (e *AccountStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AccountStatus(s)
+	case string:
+		*e = AccountStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AccountStatus: %T", src)
+	}
+	return nil
+}
+
+type NullAccountStatus struct {
+	AccountStatus AccountStatus
+	Valid         bool // Valid is true if AccountStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAccountStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.AccountStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AccountStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAccountStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AccountStatus), nil
+}
+
+type ActionRisk string
+
+const (
+	ActionRiskLow    ActionRisk = "low"
+	ActionRiskMedium ActionRisk = "medium"
+	ActionRiskHigh   ActionRisk = "high"
+)
+
+func (e *ActionRisk) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ActionRisk(s)
+	case string:
+		*e = ActionRisk(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ActionRisk: %T", src)
+	}
+	return nil
+}
+
+type NullActionRisk struct {
+	ActionRisk ActionRisk
+	Valid      bool // Valid is true if ActionRisk is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullActionRisk) Scan(value interface{}) error {
+	if value == nil {
+		ns.ActionRisk, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ActionRisk.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullActionRisk) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ActionRisk), nil
+}
+
+type AssignmentSource string
+
+const (
+	AssignmentSourceRule   AssignmentSource = "rule"
+	AssignmentSourceModel  AssignmentSource = "model"
+	AssignmentSourceManual AssignmentSource = "manual"
+)
+
+func (e *AssignmentSource) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AssignmentSource(s)
+	case string:
+		*e = AssignmentSource(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AssignmentSource: %T", src)
+	}
+	return nil
+}
+
+type NullAssignmentSource struct {
+	AssignmentSource AssignmentSource
+	Valid            bool // Valid is true if AssignmentSource is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAssignmentSource) Scan(value interface{}) error {
+	if value == nil {
+		ns.AssignmentSource, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AssignmentSource.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAssignmentSource) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AssignmentSource), nil
+}
+
+type AuditActor string
+
+const (
+	AuditActorUser   AuditActor = "user"
+	AuditActorAgent  AuditActor = "agent"
+	AuditActorSystem AuditActor = "system"
+)
+
+func (e *AuditActor) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AuditActor(s)
+	case string:
+		*e = AuditActor(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AuditActor: %T", src)
+	}
+	return nil
+}
+
+type NullAuditActor struct {
+	AuditActor AuditActor
+	Valid      bool // Valid is true if AuditActor is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAuditActor) Scan(value interface{}) error {
+	if value == nil {
+		ns.AuditActor, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AuditActor.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAuditActor) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AuditActor), nil
+}
+
+type AuthProvider string
+
+const (
+	AuthProviderGoogle   AuthProvider = "google"
+	AuthProviderZalo     AuthProvider = "zalo"
+	AuthProviderFacebook AuthProvider = "facebook"
+	AuthProviderPasskey  AuthProvider = "passkey"
+)
+
+func (e *AuthProvider) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AuthProvider(s)
+	case string:
+		*e = AuthProvider(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AuthProvider: %T", src)
+	}
+	return nil
+}
+
+type NullAuthProvider struct {
+	AuthProvider AuthProvider
+	Valid        bool // Valid is true if AuthProvider is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAuthProvider) Scan(value interface{}) error {
+	if value == nil {
+		ns.AuthProvider, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AuthProvider.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAuthProvider) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AuthProvider), nil
+}
+
+type AutonomyLevel string
+
+const (
+	AutonomyLevelAsk   AutonomyLevel = "ask"
+	AutonomyLevelDraft AutonomyLevel = "draft"
+	AutonomyLevelAuto  AutonomyLevel = "auto"
+)
+
+func (e *AutonomyLevel) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AutonomyLevel(s)
+	case string:
+		*e = AutonomyLevel(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AutonomyLevel: %T", src)
+	}
+	return nil
+}
+
+type NullAutonomyLevel struct {
+	AutonomyLevel AutonomyLevel
+	Valid         bool // Valid is true if AutonomyLevel is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAutonomyLevel) Scan(value interface{}) error {
+	if value == nil {
+		ns.AutonomyLevel, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AutonomyLevel.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAutonomyLevel) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AutonomyLevel), nil
+}
+
+type AutonomyOutcome string
+
+const (
+	AutonomyOutcomeApprovedUnchanged AutonomyOutcome = "approved_unchanged"
+	AutonomyOutcomeEdited            AutonomyOutcome = "edited"
+	AutonomyOutcomeRejected          AutonomyOutcome = "rejected"
+)
+
+func (e *AutonomyOutcome) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AutonomyOutcome(s)
+	case string:
+		*e = AutonomyOutcome(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AutonomyOutcome: %T", src)
+	}
+	return nil
+}
+
+type NullAutonomyOutcome struct {
+	AutonomyOutcome AutonomyOutcome
+	Valid           bool // Valid is true if AutonomyOutcome is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAutonomyOutcome) Scan(value interface{}) error {
+	if value == nil {
+		ns.AutonomyOutcome, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AutonomyOutcome.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAutonomyOutcome) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AutonomyOutcome), nil
+}
+
+type CommitmentDirection string
+
+const (
+	CommitmentDirectionIOwe     CommitmentDirection = "i_owe"
+	CommitmentDirectionOwedToMe CommitmentDirection = "owed_to_me"
+)
+
+func (e *CommitmentDirection) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CommitmentDirection(s)
+	case string:
+		*e = CommitmentDirection(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CommitmentDirection: %T", src)
+	}
+	return nil
+}
+
+type NullCommitmentDirection struct {
+	CommitmentDirection CommitmentDirection
+	Valid               bool // Valid is true if CommitmentDirection is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCommitmentDirection) Scan(value interface{}) error {
+	if value == nil {
+		ns.CommitmentDirection, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CommitmentDirection.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCommitmentDirection) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CommitmentDirection), nil
+}
+
+type CommitmentStatus string
+
+const (
+	CommitmentStatusOpen      CommitmentStatus = "open"
+	CommitmentStatusFulfilled CommitmentStatus = "fulfilled"
+	CommitmentStatusWaived    CommitmentStatus = "waived"
+	CommitmentStatusDropped   CommitmentStatus = "dropped"
+)
+
+func (e *CommitmentStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CommitmentStatus(s)
+	case string:
+		*e = CommitmentStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CommitmentStatus: %T", src)
+	}
+	return nil
+}
+
+type NullCommitmentStatus struct {
+	CommitmentStatus CommitmentStatus
+	Valid            bool // Valid is true if CommitmentStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCommitmentStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.CommitmentStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CommitmentStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCommitmentStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CommitmentStatus), nil
+}
+
+type ContextKind string
+
+const (
+	ContextKindWork     ContextKind = "work"
+	ContextKindStudy    ContextKind = "study"
+	ContextKindPersonal ContextKind = "personal"
+)
+
+func (e *ContextKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ContextKind(s)
+	case string:
+		*e = ContextKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ContextKind: %T", src)
+	}
+	return nil
+}
+
+type NullContextKind struct {
+	ContextKind ContextKind
+	Valid       bool // Valid is true if ContextKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullContextKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.ContextKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ContextKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullContextKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ContextKind), nil
+}
+
+type EventStatus string
+
+const (
+	EventStatusConfirmed EventStatus = "confirmed"
+	EventStatusTentative EventStatus = "tentative"
+	EventStatusCancelled EventStatus = "cancelled"
+)
+
+func (e *EventStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = EventStatus(s)
+	case string:
+		*e = EventStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for EventStatus: %T", src)
+	}
+	return nil
+}
+
+type NullEventStatus struct {
+	EventStatus EventStatus
+	Valid       bool // Valid is true if EventStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullEventStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.EventStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.EventStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullEventStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.EventStatus), nil
+}
+
+type ExecutionResult string
+
+const (
+	ExecutionResultSuccess ExecutionResult = "success"
+	ExecutionResultFailed  ExecutionResult = "failed"
+)
+
+func (e *ExecutionResult) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ExecutionResult(s)
+	case string:
+		*e = ExecutionResult(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ExecutionResult: %T", src)
+	}
+	return nil
+}
+
+type NullExecutionResult struct {
+	ExecutionResult ExecutionResult
+	Valid           bool // Valid is true if ExecutionResult is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullExecutionResult) Scan(value interface{}) error {
+	if value == nil {
+		ns.ExecutionResult, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ExecutionResult.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullExecutionResult) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ExecutionResult), nil
+}
+
+type IdentityProvider string
+
+const (
+	IdentityProviderEmail     IdentityProvider = "email"
+	IdentityProviderPhone     IdentityProvider = "phone"
+	IdentityProviderZalo      IdentityProvider = "zalo"
+	IdentityProviderFacebook  IdentityProvider = "facebook"
+	IdentityProviderInstagram IdentityProvider = "instagram"
+	IdentityProviderOther     IdentityProvider = "other"
+)
+
+func (e *IdentityProvider) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = IdentityProvider(s)
+	case string:
+		*e = IdentityProvider(s)
+	default:
+		return fmt.Errorf("unsupported scan type for IdentityProvider: %T", src)
+	}
+	return nil
+}
+
+type NullIdentityProvider struct {
+	IdentityProvider IdentityProvider
+	Valid            bool // Valid is true if IdentityProvider is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullIdentityProvider) Scan(value interface{}) error {
+	if value == nil {
+		ns.IdentityProvider, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.IdentityProvider.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullIdentityProvider) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.IdentityProvider), nil
+}
+
+type MemorySubjectType string
+
+const (
+	MemorySubjectTypePerson  MemorySubjectType = "person"
+	MemorySubjectTypeProject MemorySubjectType = "project"
+	MemorySubjectTypeContext MemorySubjectType = "context"
+	MemorySubjectTypeSelf    MemorySubjectType = "self"
+)
+
+func (e *MemorySubjectType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MemorySubjectType(s)
+	case string:
+		*e = MemorySubjectType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MemorySubjectType: %T", src)
+	}
+	return nil
+}
+
+type NullMemorySubjectType struct {
+	MemorySubjectType MemorySubjectType
+	Valid             bool // Valid is true if MemorySubjectType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMemorySubjectType) Scan(value interface{}) error {
+	if value == nil {
+		ns.MemorySubjectType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MemorySubjectType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMemorySubjectType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MemorySubjectType), nil
+}
+
+type MetricSource string
+
+const (
+	MetricSourceManual  MetricSource = "manual"
+	MetricSourceImport  MetricSource = "import"
+	MetricSourceDerived MetricSource = "derived"
+)
+
+func (e *MetricSource) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MetricSource(s)
+	case string:
+		*e = MetricSource(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MetricSource: %T", src)
+	}
+	return nil
+}
+
+type NullMetricSource struct {
+	MetricSource MetricSource
+	Valid        bool // Valid is true if MetricSource is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMetricSource) Scan(value interface{}) error {
+	if value == nil {
+		ns.MetricSource, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MetricSource.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMetricSource) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MetricSource), nil
+}
+
+type ProposedActionStatus string
+
+const (
+	ProposedActionStatusPending  ProposedActionStatus = "pending"
+	ProposedActionStatusApproved ProposedActionStatus = "approved"
+	ProposedActionStatusEdited   ProposedActionStatus = "edited"
+	ProposedActionStatusRejected ProposedActionStatus = "rejected"
+	ProposedActionStatusExpired  ProposedActionStatus = "expired"
+)
+
+func (e *ProposedActionStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ProposedActionStatus(s)
+	case string:
+		*e = ProposedActionStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ProposedActionStatus: %T", src)
+	}
+	return nil
+}
+
+type NullProposedActionStatus struct {
+	ProposedActionStatus ProposedActionStatus
+	Valid                bool // Valid is true if ProposedActionStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullProposedActionStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.ProposedActionStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ProposedActionStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullProposedActionStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ProposedActionStatus), nil
+}
+
+type ReminderChannel string
+
+const (
+	ReminderChannelApp   ReminderChannel = "app"
+	ReminderChannelEmail ReminderChannel = "email"
+	ReminderChannelPush  ReminderChannel = "push"
+)
+
+func (e *ReminderChannel) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ReminderChannel(s)
+	case string:
+		*e = ReminderChannel(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ReminderChannel: %T", src)
+	}
+	return nil
+}
+
+type NullReminderChannel struct {
+	ReminderChannel ReminderChannel
+	Valid           bool // Valid is true if ReminderChannel is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullReminderChannel) Scan(value interface{}) error {
+	if value == nil {
+		ns.ReminderChannel, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ReminderChannel.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullReminderChannel) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ReminderChannel), nil
+}
+
+type ReminderStatus string
+
+const (
+	ReminderStatusScheduled ReminderStatus = "scheduled"
+	ReminderStatusSent      ReminderStatus = "sent"
+	ReminderStatusCancelled ReminderStatus = "cancelled"
+	ReminderStatusFailed    ReminderStatus = "failed"
+)
+
+func (e *ReminderStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ReminderStatus(s)
+	case string:
+		*e = ReminderStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ReminderStatus: %T", src)
+	}
+	return nil
+}
+
+type NullReminderStatus struct {
+	ReminderStatus ReminderStatus
+	Valid          bool // Valid is true if ReminderStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullReminderStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.ReminderStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ReminderStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullReminderStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ReminderStatus), nil
+}
+
+type ReportKind string
+
+const (
+	ReportKindSession ReportKind = "session"
+	ReportKindDaily   ReportKind = "daily"
+	ReportKindWeekly  ReportKind = "weekly"
+)
+
+func (e *ReportKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ReportKind(s)
+	case string:
+		*e = ReportKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ReportKind: %T", src)
+	}
+	return nil
+}
+
+type NullReportKind struct {
+	ReportKind ReportKind
+	Valid      bool // Valid is true if ReportKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullReportKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.ReportKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ReportKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullReportKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ReportKind), nil
+}
+
+type RoutingMatchType string
+
+const (
+	RoutingMatchTypeSender  RoutingMatchType = "sender"
+	RoutingMatchTypeDomain  RoutingMatchType = "domain"
+	RoutingMatchTypeKeyword RoutingMatchType = "keyword"
+	RoutingMatchTypeSubject RoutingMatchType = "subject"
+	RoutingMatchTypeThread  RoutingMatchType = "thread"
+)
+
+func (e *RoutingMatchType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RoutingMatchType(s)
+	case string:
+		*e = RoutingMatchType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RoutingMatchType: %T", src)
+	}
+	return nil
+}
+
+type NullRoutingMatchType struct {
+	RoutingMatchType RoutingMatchType
+	Valid            bool // Valid is true if RoutingMatchType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRoutingMatchType) Scan(value interface{}) error {
+	if value == nil {
+		ns.RoutingMatchType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RoutingMatchType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRoutingMatchType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RoutingMatchType), nil
+}
+
+type RunStatus string
+
+const (
+	RunStatusQueued    RunStatus = "queued"
+	RunStatusRunning   RunStatus = "running"
+	RunStatusSucceeded RunStatus = "succeeded"
+	RunStatusFailed    RunStatus = "failed"
+	RunStatusCancelled RunStatus = "cancelled"
+)
+
+func (e *RunStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RunStatus(s)
+	case string:
+		*e = RunStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RunStatus: %T", src)
+	}
+	return nil
+}
+
+type NullRunStatus struct {
+	RunStatus RunStatus
+	Valid     bool // Valid is true if RunStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRunStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.RunStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RunStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRunStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RunStatus), nil
+}
+
+type SignalDirection string
+
+const (
+	SignalDirectionInbound  SignalDirection = "inbound"
+	SignalDirectionOutbound SignalDirection = "outbound"
+	SignalDirectionInternal SignalDirection = "internal"
+)
+
+func (e *SignalDirection) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SignalDirection(s)
+	case string:
+		*e = SignalDirection(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SignalDirection: %T", src)
+	}
+	return nil
+}
+
+type NullSignalDirection struct {
+	SignalDirection SignalDirection
+	Valid           bool // Valid is true if SignalDirection is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSignalDirection) Scan(value interface{}) error {
+	if value == nil {
+		ns.SignalDirection, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SignalDirection.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSignalDirection) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SignalDirection), nil
+}
+
+type SignalKind string
+
+const (
+	SignalKindEmail         SignalKind = "email"
+	SignalKindMessage       SignalKind = "message"
+	SignalKindCalendarEvent SignalKind = "calendar_event"
+	SignalKindFile          SignalKind = "file"
+	SignalKindNote          SignalKind = "note"
+)
+
+func (e *SignalKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SignalKind(s)
+	case string:
+		*e = SignalKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SignalKind: %T", src)
+	}
+	return nil
+}
+
+type NullSignalKind struct {
+	SignalKind SignalKind
+	Valid      bool // Valid is true if SignalKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSignalKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.SignalKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SignalKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSignalKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SignalKind), nil
+}
+
+type TaskOwner string
+
+const (
+	TaskOwnerMe    TaskOwner = "me"
+	TaskOwnerAgent TaskOwner = "agent"
+)
+
+func (e *TaskOwner) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TaskOwner(s)
+	case string:
+		*e = TaskOwner(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TaskOwner: %T", src)
+	}
+	return nil
+}
+
+type NullTaskOwner struct {
+	TaskOwner TaskOwner
+	Valid     bool // Valid is true if TaskOwner is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTaskOwner) Scan(value interface{}) error {
+	if value == nil {
+		ns.TaskOwner, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TaskOwner.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTaskOwner) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TaskOwner), nil
+}
+
+type TaskStatus string
+
+const (
+	TaskStatusOpen       TaskStatus = "open"
+	TaskStatusInProgress TaskStatus = "in_progress"
+	TaskStatusBlocked    TaskStatus = "blocked"
+	TaskStatusDone       TaskStatus = "done"
+	TaskStatusDropped    TaskStatus = "dropped"
+)
+
+func (e *TaskStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TaskStatus(s)
+	case string:
+		*e = TaskStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TaskStatus: %T", src)
+	}
+	return nil
+}
+
+type NullTaskStatus struct {
+	TaskStatus TaskStatus
+	Valid      bool // Valid is true if TaskStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTaskStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.TaskStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TaskStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTaskStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TaskStatus), nil
+}
+
 type Account struct {
-	ID             uuid.UUID
-	UserID         uuid.UUID
-	Provider       string
-	Reliability    string
-	DisplayName    string
-	CredentialsEnc []byte
-	Status         string
-	LastSyncAt     pgtype.Timestamptz
-	LastError      string
-	CreatedAt      pgtype.Timestamptz
-	UpdatedAt      pgtype.Timestamptz
+	ID                uuid.UUID
+	UserID            uuid.UUID
+	Provider          AccountProvider
+	Reliability       AccountReliability
+	DisplayName       string
+	ExternalAccountID *string
+	CredentialsEnc    []byte
+	Scopes            []string
+	SyncCursor        []byte
+	Status            AccountStatus
+	LastSyncAt        pgtype.Timestamptz
+	LastError         *string
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 type AccountContext struct {
 	AccountID uuid.UUID
 	ContextID uuid.UUID
+	CreatedAt pgtype.Timestamptz
+}
+
+type ActionType struct {
+	Code             string
+	Label            string
+	IsOutbound       bool
+	Risk             ActionRisk
+	UpgradeThreshold int16
+	CreatedAt        pgtype.Timestamptz
+}
+
+type AuditLog struct {
+	ID         int64
+	UserID     *uuid.UUID
+	EntityType string
+	EntityID   *uuid.UUID
+	Action     string
+	Actor      AuditActor
+	Diff       []byte
+	CreatedAt  pgtype.Timestamptz
+}
+
+type AuthIdentity struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	Provider    AuthProvider
+	Subject     string
+	Email       *string
+	IsPrimary   bool
+	LinkedAt    pgtype.Timestamptz
+	LastLoginAt pgtype.Timestamptz
+}
+
+type AuthSession struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	IdentityID *uuid.UUID
+	TokenHash  []byte
+	IssuedAt   pgtype.Timestamptz
+	LastSeenAt pgtype.Timestamptz
+	ExpiresAt  pgtype.Timestamptz
+	RevokedAt  pgtype.Timestamptz
+	UserAgent  string
+	Ip         *netip.Addr
+}
+
+type AutonomyEvidence struct {
+	ID               uuid.UUID
+	AutonomyRuleID   uuid.UUID
+	ProposedActionID uuid.UUID
+	Outcome          AutonomyOutcome
+	CreatedAt        pgtype.Timestamptz
+}
+
+type AutonomyRule struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	ContextID      uuid.UUID
+	ActionTypeCode string
+	Level          AutonomyLevel
+	PromotedAt     pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
+type AutonomyStreak struct {
+	AutonomyRuleID   uuid.UUID
+	ContextID        uuid.UUID
+	ActionTypeCode   string
+	Level            AutonomyLevel
+	UpgradeThreshold int16
+	CleanStreak      int32
+	UpgradeReady     *bool
+}
+
+type Commitment struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	ContextID        uuid.UUID
+	PersonID         *uuid.UUID
+	EvidenceSignalID *uuid.UUID
+	Direction        CommitmentDirection
+	What             string
+	Status           CommitmentStatus
+	PromisedAt       pgtype.Timestamptz
+	DueAt            pgtype.Timestamptz
+	ResolvedAt       pgtype.Timestamptz
+	IsConfirmed      bool
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
+type CommitmentsLive struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	ContextID        uuid.UUID
+	PersonID         *uuid.UUID
+	EvidenceSignalID *uuid.UUID
+	Direction        CommitmentDirection
+	What             string
+	Status           CommitmentStatus
+	PromisedAt       pgtype.Timestamptz
+	DueAt            pgtype.Timestamptz
+	ResolvedAt       pgtype.Timestamptz
+	IsConfirmed      bool
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	IsOverdue        *bool
+	DaysOverdue      int32
 }
 
 type Context struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID
 	ParentID    *uuid.UUID
+	Slug        string
 	Name        string
-	Kind        string
+	Kind        ContextKind
+	Color       *string
 	ActiveHours []byte
-	ToneProfile string
+	ToneProfile *string
+	Position    int32
 	IsArchived  bool
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
 }
 
-type Identity struct {
+type ContextTree struct {
 	ID       uuid.UUID
-	PersonID uuid.UUID
-	Provider string
-	Handle   string
-	Verified bool
+	UserID   uuid.UUID
+	RootID   uuid.UUID
+	Path     string
+	Depth    int32
+	Ancestry interface{}
+}
+
+type Event struct {
+	ID                 uuid.UUID
+	UserID             uuid.UUID
+	ContextID          uuid.UUID
+	SourceSignalID     *uuid.UUID
+	PersonID           *uuid.UUID
+	ExternalCalendarID *string
+	ExternalEventID    *string
+	Title              string
+	Description        *string
+	Location           *string
+	StartAt            pgtype.Timestamptz
+	EndAt              pgtype.Timestamptz
+	AllDay             bool
+	Status             EventStatus
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+type Execution struct {
+	ID               uuid.UUID
+	ProposedActionID uuid.UUID
+	Result           ExecutionResult
+	ExternalRef      *string
+	UndoToken        *string
+	UndoneAt         pgtype.Timestamptz
+	Error            *string
+	ExecutedAt       pgtype.Timestamptz
+}
+
+type Identity struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	PersonID   uuid.UUID
+	Provider   IdentityProvider
+	Handle     string
+	IsVerified bool
+	CreatedAt  pgtype.Timestamptz
+}
+
+type MemoryNote struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	ContextID      *uuid.UUID
+	SubjectType    MemorySubjectType
+	SubjectID      *uuid.UUID
+	Content        string
+	SourceSignalID *uuid.UUID
+	Confidence     pgtype.Numeric
+	Embedding      *pgvector.Vector
+	IsPinned       bool
+	UseCount       int32
+	LastUsedAt     pgtype.Timestamptz
+	SupersededBy   *uuid.UUID
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
+type Metric struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	ContextID  uuid.UUID
+	Metric     string
+	Value      pgtype.Numeric
+	Unit       string
+	Source     MetricSource
+	Note       *string
+	RecordedAt pgtype.Timestamptz
+	CreatedAt  pgtype.Timestamptz
 }
 
 type Person struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	DisplayName      string
+	PrimaryContextID *uuid.UUID
+	Organisation     *string
+	Notes            *string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
+type PromptTemplate struct {
+	ID        uuid.UUID
+	Name      string
+	Version   int32
+	Body      string
+	Variables []byte
+	Model     string
+	MaxTokens int32
+	IsActive  bool
+	Notes     *string
+	CreatedAt pgtype.Timestamptz
+}
+
+type ProposedAction struct {
+	ID             uuid.UUID
+	RunID          uuid.UUID
+	ActionTypeCode string
+	Payload        []byte
+	PayloadEdited  []byte
+	Status         ProposedActionStatus
+	ReviewNote     *string
+	ReviewedAt     pgtype.Timestamptz
+	ExpiresAt      pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+}
+
+type Reminder struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	TaskID       *uuid.UUID
+	EventID      *uuid.UUID
+	CommitmentID *uuid.UUID
+	RemindAt     pgtype.Timestamptz
+	Channel      ReminderChannel
+	Status       ReminderStatus
+	Body         *string
+	Attempts     int16
+	SentAt       pgtype.Timestamptz
+	LastError    *string
+	CreatedAt    pgtype.Timestamptz
+}
+
+type Report struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID
-	DisplayName string
-	Notes       string
+	SessionID   *uuid.UUID
+	Kind        ReportKind
+	PeriodStart pgtype.Timestamptz
+	PeriodEnd   pgtype.Timestamptz
+	ContentMd   string
 	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
 }
 
 type RoutingRule struct {
 	ID         uuid.UUID
+	UserID     uuid.UUID
 	ContextID  uuid.UUID
-	MatchType  string
+	MatchType  RoutingMatchType
 	MatchValue string
 	Priority   int32
 	IsActive   bool
@@ -69,30 +1498,103 @@ type RoutingRule struct {
 	UpdatedAt  pgtype.Timestamptz
 }
 
+type Run struct {
+	ID               uuid.UUID
+	SessionID        uuid.UUID
+	ContextID        uuid.UUID
+	TaskID           *uuid.UUID
+	ActionTypeCode   string
+	PromptTemplateID *uuid.UUID
+	AutonomyApplied  AutonomyLevel
+	Model            string
+	Status           RunStatus
+	TokensIn         int32
+	TokensOut        int32
+	CostUsd          pgtype.Numeric
+	StartedAt        pgtype.Timestamptz
+	EndedAt          pgtype.Timestamptz
+	Error            *string
+	CreatedAt        pgtype.Timestamptz
+}
+
+type RunStep struct {
+	ID         uuid.UUID
+	RunID      uuid.UUID
+	StepNo     int16
+	Tool       string
+	Input      []byte
+	Output     []byte
+	DurationMs *int32
+	CreatedAt  pgtype.Timestamptz
+}
+
 type Signal struct {
-	ID          uuid.UUID
-	AccountID   uuid.UUID
-	ExternalID  string
-	Kind        string
-	Payload     []byte
-	ContentHash string
-	OccurredAt  pgtype.Timestamptz
-	IngestedAt  pgtype.Timestamptz
-	ProcessedAt pgtype.Timestamptz
+	ID               uuid.UUID
+	AccountID        uuid.UUID
+	ExternalID       string
+	ExternalThreadID *string
+	Kind             SignalKind
+	Direction        SignalDirection
+	Subject          *string
+	Snippet          *string
+	Payload          []byte
+	ContentHash      *string
+	OccurredAt       pgtype.Timestamptz
+	IngestedAt       pgtype.Timestamptz
+	ProcessedAt      pgtype.Timestamptz
+	ProcessingError  *string
 }
 
 type SignalContext struct {
 	SignalID   uuid.UUID
 	ContextID  uuid.UUID
-	Confidence float64
-	AssignedBy string
+	Confidence pgtype.Numeric
+	AssignedBy AssignmentSource
 	CreatedAt  pgtype.Timestamptz
+}
+
+type Task struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	ContextID        uuid.UUID
+	SourceSignalID   *uuid.UUID
+	ParentTaskID     *uuid.UUID
+	Title            string
+	Detail           *string
+	Status           TaskStatus
+	Owner            TaskOwner
+	Priority         int16
+	DueAt            pgtype.Timestamptz
+	EstimatedMinutes *int32
+	BlockedReason    *string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	CompletedAt      pgtype.Timestamptz
 }
 
 type User struct {
 	ID          uuid.UUID
 	Email       string
 	DisplayName string
+	Timezone    string
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
+}
+
+type WorkSession struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	Label       *string
+	StartedAt   pgtype.Timestamptz
+	EndedAt     pgtype.Timestamptz
+	TokensIn    int64
+	TokensOut   int64
+	CostUsd     pgtype.Numeric
+	TokenBudget *int64
+	CreatedAt   pgtype.Timestamptz
+}
+
+type WorkSessionContext struct {
+	SessionID uuid.UUID
+	ContextID uuid.UUID
 }

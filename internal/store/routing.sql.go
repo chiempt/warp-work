@@ -23,8 +23,8 @@ SET confidence  = EXCLUDED.confidence,
 type AssignSignalContextParams struct {
 	SignalID   uuid.UUID
 	ContextID  uuid.UUID
-	Confidence float64
-	AssignedBy string
+	Confidence pgtype.Numeric
+	AssignedBy AssignmentSource
 	CreatedAt  pgtype.Timestamptz
 }
 
@@ -40,7 +40,7 @@ func (q *Queries) AssignSignalContext(ctx context.Context, arg AssignSignalConte
 }
 
 const listActiveRoutingRules = `-- name: ListActiveRoutingRules :many
-SELECT r.id, r.context_id, r.match_type, r.match_value, r.priority, r.is_active, r.created_at, r.updated_at
+SELECT r.id, r.user_id, r.context_id, r.match_type, r.match_value, r.priority, r.is_active, r.created_at, r.updated_at
 FROM routing_rules r
 JOIN contexts c ON c.id = r.context_id
 WHERE c.user_id = $1
@@ -60,6 +60,7 @@ func (q *Queries) ListActiveRoutingRules(ctx context.Context, userID uuid.UUID) 
 		var i RoutingRule
 		if err := rows.Scan(
 			&i.ID,
+			&i.UserID,
 			&i.ContextID,
 			&i.MatchType,
 			&i.MatchValue,

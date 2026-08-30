@@ -5,7 +5,8 @@ hits one of these picks a defensible default, marks it `TODO(open-question-N)` i
 which default it chose.
 
 Answering one means editing this file *and* the context document, and writing an ADR if the answer
-constrains later work.
+constrains later work. Three of the five were answered by the schema rather than by discussion —
+the entries below say which parts are settled and which are still open.
 
 ---
 
@@ -19,25 +20,28 @@ rate is unmeasured.
 wrong. Cannot be answered from first principles.
 **Working default:** auto-assign above 0.8, manual queue below. Log everything.
 
-### 2. Autonomy upgrade threshold
+### 2. Autonomy upgrade threshold — *partly answered*
 
 How many consecutive `approved_unchanged` outcomes should trigger an upgrade proposal — and should
 the threshold scale with how damaging the action is?
 
+**Answered by the schema:** yes, it scales. `action_types` carries `risk` and a per-action
+`upgrade_threshold`, so the threshold is a property of the action type rather than a global number.
+**Still open:** the actual numbers, per risk level.
 **Blocks:** Phase 4 only.
-**Leaning:** yes, it should scale. Sending an email to the main company job and updating an internal
+**Original reasoning:** yes, it should scale. Sending an email to the main company job and updating an internal
 record are not the same risk, and a single threshold would have to be set for the worst case, making
 the ladder useless for everything else.
 
-### 3. Automatic vs confirmed commitment extraction
+### 3. Automatic vs confirmed commitment extraction — *answered*
 
 Should commitments be extracted automatically, or confirmed by the owner on first detection until
 precision has been measured?
 
 **Blocks:** Phase 2. This is the highest-value table in the system, and a false commitment is worse
 than a missed one — it erodes trust in the whole record.
-**Working default:** confirm on first detection. Flip to automatic once precision is measured on real
-traffic, per context.
+**Answered by the schema:** `commitments.is_confirmed` — confirmed on first detection, exactly the
+working default below. Flipping to automatic once precision is measured stays a later decision.
 
 ### 4. Signal payload retention
 
@@ -47,10 +51,13 @@ How long are raw payloads kept before being pruned to metadata?
 re-running improved extraction over history possible — pruning them forecloses that.
 **Note:** whatever the answer, `content_hash`, `occurred_at`, and the derived records survive pruning.
 
-### 5. Token budget
+### 5. Token budget — *partly answered*
 
 What is the acceptable monthly spend, and what does the system do when it is exceeded mid-session?
 
+**Answered by the schema:** the budget is scoped to a work session (`work_sessions.token_budget`),
+with spend recorded per run (`runs.cost_usd`, `runs.tokens_in`, `runs.tokens_out`).
+**Still open:** the number itself, and what happens when it is exceeded mid-session.
 **Blocks:** Phase 3.
 **Needs:** a measured cost per signal through the ADR 0003 tiering, which needs Phase 2 running.
 **Design constraint regardless of the number:** exceeding the budget must degrade, not fail. Routing

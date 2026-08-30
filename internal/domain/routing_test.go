@@ -3,7 +3,7 @@ package domain_test
 import (
 	"testing"
 
-	"github.com/chiempham/warp/internal/domain"
+	"github.com/chiempham/warp-work/internal/domain"
 )
 
 func facts() domain.SignalFacts {

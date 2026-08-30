@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chiempham/warp/internal/domain"
+	"github.com/chiempham/warp-work/internal/domain"
 )
 
 func TestActiveHours_emptyMeansAlwaysActive(t *testing.T) {

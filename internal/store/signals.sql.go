@@ -13,7 +13,7 @@ import (
 )
 
 const getSignalByExternalID = `-- name: GetSignalByExternalID :one
-SELECT id, account_id, external_id, kind, payload, content_hash, occurred_at, ingested_at, processed_at FROM signals WHERE account_id = $1 AND external_id = $2
+SELECT id, account_id, external_id, external_thread_id, kind, direction, subject, snippet, payload, content_hash, occurred_at, ingested_at, processed_at, processing_error FROM signals WHERE account_id = $1 AND external_id = $2
 `
 
 type GetSignalByExternalIDParams struct {
@@ -28,12 +28,17 @@ func (q *Queries) GetSignalByExternalID(ctx context.Context, arg GetSignalByExte
 		&i.ID,
 		&i.AccountID,
 		&i.ExternalID,
+		&i.ExternalThreadID,
 		&i.Kind,
+		&i.Direction,
+		&i.Subject,
+		&i.Snippet,
 		&i.Payload,
 		&i.ContentHash,
 		&i.OccurredAt,
 		&i.IngestedAt,
 		&i.ProcessedAt,
+		&i.ProcessingError,
 	)
 	return i, err
 }
@@ -42,16 +47,16 @@ const ingestSignal = `-- name: IngestSignal :one
 INSERT INTO signals (id, account_id, external_id, kind, payload, content_hash, occurred_at, ingested_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (account_id, external_id) DO NOTHING
-RETURNING id, account_id, external_id, kind, payload, content_hash, occurred_at, ingested_at, processed_at
+RETURNING id, account_id, external_id, external_thread_id, kind, direction, subject, snippet, payload, content_hash, occurred_at, ingested_at, processed_at, processing_error
 `
 
 type IngestSignalParams struct {
 	ID          uuid.UUID
 	AccountID   uuid.UUID
 	ExternalID  string
-	Kind        string
+	Kind        SignalKind
 	Payload     []byte
-	ContentHash string
+	ContentHash *string
 	OccurredAt  pgtype.Timestamptz
 	IngestedAt  pgtype.Timestamptz
 }
@@ -75,18 +80,23 @@ func (q *Queries) IngestSignal(ctx context.Context, arg IngestSignalParams) (Sig
 		&i.ID,
 		&i.AccountID,
 		&i.ExternalID,
+		&i.ExternalThreadID,
 		&i.Kind,
+		&i.Direction,
+		&i.Subject,
+		&i.Snippet,
 		&i.Payload,
 		&i.ContentHash,
 		&i.OccurredAt,
 		&i.IngestedAt,
 		&i.ProcessedAt,
+		&i.ProcessingError,
 	)
 	return i, err
 }
 
 const listContextTimeline = `-- name: ListContextTimeline :many
-SELECT s.id, s.account_id, s.external_id, s.kind, s.payload, s.content_hash, s.occurred_at, s.ingested_at, s.processed_at, sc.confidence, sc.assigned_by
+SELECT s.id, s.account_id, s.external_id, s.external_thread_id, s.kind, s.direction, s.subject, s.snippet, s.payload, s.content_hash, s.occurred_at, s.ingested_at, s.processed_at, s.processing_error, sc.confidence, sc.assigned_by
 FROM signals s
 JOIN signal_contexts sc ON sc.signal_id = s.id
 WHERE sc.context_id = ANY ($1::uuid[])
@@ -102,17 +112,22 @@ type ListContextTimelineParams struct {
 }
 
 type ListContextTimelineRow struct {
-	ID          uuid.UUID
-	AccountID   uuid.UUID
-	ExternalID  string
-	Kind        string
-	Payload     []byte
-	ContentHash string
-	OccurredAt  pgtype.Timestamptz
-	IngestedAt  pgtype.Timestamptz
-	ProcessedAt pgtype.Timestamptz
-	Confidence  float64
-	AssignedBy  string
+	ID               uuid.UUID
+	AccountID        uuid.UUID
+	ExternalID       string
+	ExternalThreadID *string
+	Kind             SignalKind
+	Direction        SignalDirection
+	Subject          *string
+	Snippet          *string
+	Payload          []byte
+	ContentHash      *string
+	OccurredAt       pgtype.Timestamptz
+	IngestedAt       pgtype.Timestamptz
+	ProcessedAt      pgtype.Timestamptz
+	ProcessingError  *string
+	Confidence       pgtype.Numeric
+	AssignedBy       AssignmentSource
 }
 
 // ListContextTimeline is the read path behind the timeline view. It is
@@ -130,12 +145,17 @@ func (q *Queries) ListContextTimeline(ctx context.Context, arg ListContextTimeli
 			&i.ID,
 			&i.AccountID,
 			&i.ExternalID,
+			&i.ExternalThreadID,
 			&i.Kind,
+			&i.Direction,
+			&i.Subject,
+			&i.Snippet,
 			&i.Payload,
 			&i.ContentHash,
 			&i.OccurredAt,
 			&i.IngestedAt,
 			&i.ProcessedAt,
+			&i.ProcessingError,
 			&i.Confidence,
 			&i.AssignedBy,
 		); err != nil {
@@ -150,7 +170,7 @@ func (q *Queries) ListContextTimeline(ctx context.Context, arg ListContextTimeli
 }
 
 const listUnroutedSignals = `-- name: ListUnroutedSignals :many
-SELECT s.id, s.account_id, s.external_id, s.kind, s.payload, s.content_hash, s.occurred_at, s.ingested_at, s.processed_at
+SELECT s.id, s.account_id, s.external_id, s.external_thread_id, s.kind, s.direction, s.subject, s.snippet, s.payload, s.content_hash, s.occurred_at, s.ingested_at, s.processed_at, s.processing_error
 FROM signals s
 WHERE s.processed_at IS NULL
   AND s.account_id = ANY ($1::uuid[])
@@ -178,12 +198,17 @@ func (q *Queries) ListUnroutedSignals(ctx context.Context, arg ListUnroutedSigna
 			&i.ID,
 			&i.AccountID,
 			&i.ExternalID,
+			&i.ExternalThreadID,
 			&i.Kind,
+			&i.Direction,
+			&i.Subject,
+			&i.Snippet,
 			&i.Payload,
 			&i.ContentHash,
 			&i.OccurredAt,
 			&i.IngestedAt,
 			&i.ProcessedAt,
+			&i.ProcessingError,
 		); err != nil {
 			return nil, err
 		}

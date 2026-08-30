@@ -8,15 +8,19 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/chiempham/warp/apps/api/internal/httpapi"
-	"github.com/chiempham/warp/internal/config"
+	"github.com/chiempham/warp-work/apps/api/internal/httpapi"
+	"github.com/chiempham/warp-work/internal/config"
 )
 
 func newServer(t *testing.T) http.Handler {
 	t.Helper()
 	logger := slog.New(slog.DiscardHandler)
 	// The pool is only touched by /readyz, which these tests do not exercise.
-	return httpapi.New(config.Config{Env: config.EnvDevelopment}, logger, nil).Handler()
+	srv, err := httpapi.New(config.Config{Env: config.EnvDevelopment}, logger, nil)
+	if err != nil {
+		t.Fatalf("build server: %v", err)
+	}
+	return srv.Handler()
 }
 
 func TestLiveness_doesNotDependOnTheDatabase(t *testing.T) {

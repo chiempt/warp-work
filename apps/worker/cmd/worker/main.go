@@ -16,11 +16,11 @@ import (
 
 	"github.com/hibiken/asynq"
 
-	"github.com/chiempham/warp/apps/worker/internal/tasks"
-	"github.com/chiempham/warp/internal/config"
-	"github.com/chiempham/warp/internal/platform/logging"
-	"github.com/chiempham/warp/internal/platform/postgres"
-	"github.com/chiempham/warp/internal/platform/queue"
+	"github.com/chiempham/warp-work/apps/worker/internal/tasks"
+	"github.com/chiempham/warp-work/internal/config"
+	"github.com/chiempham/warp-work/internal/platform/logging"
+	"github.com/chiempham/warp-work/internal/platform/postgres"
+	"github.com/chiempham/warp-work/internal/platform/queue"
 )
 
 func main() {

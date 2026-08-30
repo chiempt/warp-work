@@ -17,7 +17,7 @@ pnpm project under `apps/web`.
 
 ```
 warp/
-  go.mod                    module github.com/chiempham/warp
+  go.mod                    module github.com/chiempham/warp-work
   Makefile                  every developer command
   sqlc.yaml
   apps/
@@ -73,7 +73,8 @@ Rules:
 | Foreign key | `<singular_table>_id` | `context_id`, `source_signal_id` |
 | Timestamp column | `<verb>_at`, UTC | `ingested_at`, `undone_at` |
 | Boolean column | `is_` / `has_` prefix | `is_active`, `is_archived` |
-| Enum-like column | `text` + `CHECK`, lowercase values | `status IN ('open','fulfilled',...)` |
+| Enum type | `snake_case` singular, named for the column | `autonomy_level`, `auth_provider` |
+| Enum value | lowercase `snake_case` | `needs_reauth` |
 | Migration file | `NNNNN_short_description.sql` | `00007_add_autonomy_evidence.sql` |
 | Go package | short, lowercase, no underscores, a noun | `router`, `extractor`, `store` |
 | Go interface | what it does, `-er` where natural | `SignalIngester`, `Executor` |
@@ -96,8 +97,16 @@ a `signal` is called a signal — in Go, in SQL, in TSX, and in the interface.
 - JSON columns are `jsonb`. Raw external payloads go into `signals.payload` untouched — no
   normalisation, no key filtering, no re-serialisation.
 - Every table has `created_at`. Mutable tables also have `updated_at`.
+- Enum-like columns are **native Postgres `ENUM` types**, declared together in
+  `db/migrations/00002_enums.sql`. Adding a value later is `ALTER TYPE ... ADD VALUE`, which cannot
+  run inside a transaction and cannot use the new value in the same one — so it needs its own
+  migration marked `-- +goose NO TRANSACTION`. A value can never be removed. Add plausible values up
+  front; they are cheap now and awkward later.
 - Deletes are soft where history matters (`is_archived`, `status = 'dropped'`). `signals`,
   `executions`, and `audit_log` are never deleted by application code.
+- A rule whose violation cannot be undone belongs in the database, not in the application: signals
+  are immutable, and the last `auth_identities` row cannot be deleted. Both are triggers, because
+  "every code path remembers" is not a guarantee.
 - Index every foreign key, and every column in a routing or session-scoped query —
   `signal_contexts (context_id, signal_id)` and `commitments (context_id, status, due_at)` first.
 - One `pgvector` index, on `memory_notes.embedding`. A second vector index means the design drifted;
@@ -160,8 +169,13 @@ a `signal` is called a signal — in Go, in SQL, in TSX, and in the interface.
 
 ## 6. HTTP API
 
-- `docs/api/openapi.yaml` is the contract. `oapi-codegen` generates Echo server interfaces and the
-  frontend client. Neither side is hand-written; a handler that drifts from the spec fails to compile.
+- `docs/api/openapi.yaml` is the contract. `ogen` generates the server under
+  `apps/api/internal/api/`; nothing there is hand-written. Echo owns the outer server and the
+  operational endpoints; everything under `/api/v1` is the generated handler. See
+  [ADR 0007](decisions/0007-openapi-with-ogen.md).
+- Routes are declared in the spec, not in Go. An operation with no implementation answers 501.
+- Validation belongs in the spec — required parameters, formats, ranges, enums. A handler that
+  re-checks what the schema already declares is duplicating the contract.
 - REST, plural resource paths, `/api/v1` prefix.
 - Every list endpoint is context-scoped. There is no unfiltered `GET /api/v1/signals`.
 - Errors return `{ "error": { "code", "message", "details" } }` with a meaningful status.

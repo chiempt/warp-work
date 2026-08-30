@@ -1,0 +1,431 @@
+%% Warp — complete database schema
+%% 27 tables, 3 views (views not shown; see db/migrations/00010_views.sql)
+%% Render at https://mermaid.live or with the mermaid CLI:
+%%   mmdc -i db/schema.mmd -o db/schema.svg -w 3000
+
+erDiagram
+
+    %% ─────────────────────────── FOUNDATION ───────────────────────────
+
+    USERS {
+        uuid        id           PK
+        citext      email        UK
+        text        display_name
+        text        timezone
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CONTEXTS {
+        uuid         id           PK
+        uuid         user_id      FK
+        uuid         parent_id    FK "self-referencing, max depth 8"
+        text         slug         UK "unique per user"
+        text         name
+        context_kind kind         "work | study | personal"
+        text         color
+        jsonb        active_hours
+        text         tone_profile
+        integer      position
+        boolean      is_archived
+        timestamptz  created_at
+        timestamptz  updated_at
+    }
+
+    %% ──────────────────────────── SOURCES ─────────────────────────────
+
+    ACCOUNTS {
+        uuid                id                  PK
+        uuid                user_id             FK
+        account_provider    provider            "gmail | gcalendar | zalo_oa | manual"
+        account_reliability reliability         "official | unofficial | manual"
+        text                display_name
+        text                external_account_id
+        bytea               credentials_enc     "encrypted by the app"
+        text_array          scopes
+        jsonb               sync_cursor         "historyId, syncToken"
+        account_status      status
+        timestamptz         last_sync_at
+        text                last_error
+        timestamptz         created_at
+        timestamptz         updated_at
+    }
+
+    ACCOUNT_CONTEXTS {
+        uuid        account_id PK "FK"
+        uuid        context_id PK "FK"
+        timestamptz created_at
+    }
+
+    ROUTING_RULES {
+        uuid               id          PK
+        uuid               user_id     FK
+        uuid               context_id  FK
+        routing_match_type match_type  "sender | domain | keyword | subject | thread"
+        text               match_value "lowercase enforced"
+        integer            priority
+        boolean            is_active
+        timestamptz        created_at
+        timestamptz        updated_at
+    }
+
+    SIGNALS {
+        uuid             id                 PK
+        uuid             account_id         FK
+        text             external_id        UK "unique with account_id"
+        text             external_thread_id
+        signal_kind      kind               "email | message | calendar_event | file | note"
+        signal_direction direction
+        text             subject
+        text             snippet
+        jsonb            payload            "immutable, trigger-enforced"
+        text             content_hash       "sha256 hex"
+        timestamptz      occurred_at
+        timestamptz      ingested_at
+        timestamptz      processed_at       "null means queued"
+        text             processing_error
+    }
+
+    SIGNAL_CONTEXTS {
+        uuid              signal_id   PK "FK"
+        uuid              context_id  PK "FK"
+        numeric           confidence  "0.000 to 1.000"
+        assignment_source assigned_by "rule | model | manual"
+        timestamptz       created_at
+    }
+
+    %% ──────────────────────────── PEOPLE ──────────────────────────────
+
+    PEOPLE {
+        uuid        id                 PK
+        uuid        user_id            FK
+        uuid        primary_context_id FK
+        text        display_name
+        text        organisation
+        text        notes
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    IDENTITIES {
+        uuid              id          PK
+        uuid              user_id     FK
+        uuid              person_id   FK
+        identity_provider provider    "email | phone | zalo | facebook | instagram"
+        citext            handle      UK "unique per user and provider"
+        boolean           is_verified
+        timestamptz       created_at
+    }
+
+    %% ────────────────────────── WORK ITEMS ────────────────────────────
+
+    TASKS {
+        uuid        id                PK
+        uuid        user_id           FK
+        uuid        context_id        FK
+        uuid        source_signal_id  FK
+        uuid        parent_task_id    FK
+        text        title
+        text        detail
+        task_status status            "open | in_progress | blocked | done | dropped"
+        task_owner  owner             "me | agent"
+        smallint    priority          "1 to 5"
+        timestamptz due_at
+        integer     estimated_minutes
+        text        blocked_reason    "required when blocked"
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz completed_at      "paired with status done"
+    }
+
+    EVENTS {
+        uuid         id                   PK
+        uuid         user_id              FK
+        uuid         context_id           FK
+        uuid         source_signal_id     FK
+        uuid         person_id            FK
+        text         external_calendar_id
+        text         external_event_id    UK
+        text         title
+        text         description
+        text         location
+        timestamptz  start_at
+        timestamptz  end_at
+        boolean      all_day
+        event_status status
+        timestamptz  created_at
+        timestamptz  updated_at
+    }
+
+    COMMITMENTS {
+        uuid                 id                 PK
+        uuid                 user_id            FK
+        uuid                 context_id         FK
+        uuid                 person_id          FK
+        uuid                 evidence_signal_id FK
+        commitment_direction direction          "i_owe | owed_to_me"
+        text                 what
+        commitment_status    status             "open | fulfilled | waived | dropped"
+        timestamptz          promised_at
+        timestamptz          due_at
+        timestamptz          resolved_at
+        boolean              is_confirmed
+        timestamptz          created_at
+        timestamptz          updated_at
+    }
+
+    REMINDERS {
+        uuid             id            PK
+        uuid             user_id       FK
+        uuid             task_id       FK "exactly one of these three"
+        uuid             event_id      FK
+        uuid             commitment_id FK
+        timestamptz      remind_at
+        reminder_channel channel
+        reminder_status  status
+        text             body
+        smallint         attempts
+        timestamptz      sent_at
+        text             last_error
+        timestamptz      created_at
+    }
+
+    METRICS {
+        uuid          id          PK
+        uuid          user_id     FK
+        uuid          context_id  FK
+        text          metric
+        numeric       value
+        text          unit
+        metric_source source
+        text          note
+        timestamptz   recorded_at
+        timestamptz   created_at
+    }
+
+    %% ──────────────────────────── MEMORY ──────────────────────────────
+
+    MEMORY_NOTES {
+        uuid                id               PK
+        uuid                user_id          FK
+        uuid                context_id       FK "null means global"
+        memory_subject_type subject_type     "person | project | context | self"
+        uuid                subject_id       "resolved by subject_type"
+        text                content
+        uuid                source_signal_id FK
+        numeric             confidence
+        vector              embedding        "1536 dims, hnsw cosine"
+        boolean             is_pinned
+        integer             use_count
+        timestamptz         last_used_at
+        uuid                superseded_by    FK
+        timestamptz         created_at
+        timestamptz         updated_at
+    }
+
+    %% ────────────────────────── EXECUTION ─────────────────────────────
+
+    ACTION_TYPES {
+        text        code              PK
+        text        label
+        boolean     is_outbound       "changes the outside world"
+        action_risk risk              "low | medium | high"
+        smallint    upgrade_threshold "clean approvals before promotion"
+        timestamptz created_at
+    }
+
+    PROMPT_TEMPLATES {
+        uuid        id         PK
+        text        name       UK "unique with version"
+        integer     version
+        text        body
+        jsonb       variables
+        text        model
+        integer     max_tokens
+        boolean     is_active  "one active per name"
+        text        notes
+        timestamptz created_at
+    }
+
+    WORK_SESSIONS {
+        uuid        id           PK
+        uuid        user_id      FK
+        text        label
+        timestamptz started_at
+        timestamptz ended_at     "null means open, only one allowed"
+        bigint      tokens_in
+        bigint      tokens_out
+        numeric     cost_usd
+        bigint      token_budget
+        timestamptz created_at
+    }
+
+    WORK_SESSION_CONTEXTS {
+        uuid session_id PK "FK"
+        uuid context_id PK "FK"
+    }
+
+    RUNS {
+        uuid           id                 PK
+        uuid           session_id         FK
+        uuid           context_id         FK
+        uuid           task_id            FK
+        text           action_type_code   FK
+        uuid           prompt_template_id FK
+        autonomy_level autonomy_applied   "frozen at dispatch"
+        text           model
+        run_status     status
+        integer        tokens_in
+        integer        tokens_out
+        numeric        cost_usd
+        timestamptz    started_at
+        timestamptz    ended_at
+        text           error              "required when failed"
+        timestamptz    created_at
+    }
+
+    RUN_STEPS {
+        uuid        id          PK
+        uuid        run_id      FK
+        smallint    step_no     UK "unique per run"
+        text        tool
+        jsonb       input
+        jsonb       output
+        integer     duration_ms
+        timestamptz created_at
+    }
+
+    PROPOSED_ACTIONS {
+        uuid                   id               PK
+        uuid                   run_id           FK
+        text                   action_type_code FK
+        jsonb                  payload          "what the agent wants to do"
+        jsonb                  payload_edited   "what the user changed it to"
+        proposed_action_status status           "pending | approved | edited | rejected | expired"
+        text                   review_note
+        timestamptz            reviewed_at
+        timestamptz            expires_at
+        timestamptz            created_at
+    }
+
+    EXECUTIONS {
+        uuid             id                 PK
+        uuid             proposed_action_id FK "one to one"
+        execution_result result
+        text             external_ref       "provider-side id"
+        text             undo_token
+        timestamptz      undone_at
+        text             error
+        timestamptz      executed_at
+    }
+
+    %% ──────────────────────────── CONTROL ─────────────────────────────
+
+    AUTONOMY_RULES {
+        uuid           id               PK
+        uuid           user_id          FK
+        uuid           context_id       FK
+        text           action_type_code FK
+        autonomy_level level            "ask | draft | auto"
+        timestamptz    promoted_at
+        timestamptz    created_at
+        timestamptz    updated_at
+    }
+
+    AUTONOMY_EVIDENCE {
+        uuid             id                 PK
+        uuid             autonomy_rule_id   FK
+        uuid             proposed_action_id FK "one to one"
+        autonomy_outcome outcome            "approved_unchanged | edited | rejected"
+        timestamptz      created_at
+    }
+
+    REPORTS {
+        uuid        id           PK
+        uuid        user_id      FK
+        uuid        session_id   FK
+        report_kind kind         "session | daily | weekly"
+        timestamptz period_start
+        timestamptz period_end
+        text        content_md
+        timestamptz created_at
+    }
+
+    AUDIT_LOG {
+        bigint      id          PK
+        uuid        user_id     FK
+        text        entity_type
+        uuid        entity_id
+        text        action
+        audit_actor actor       "user | agent | system"
+        jsonb       diff
+        timestamptz created_at
+    }
+
+    %% ───────────────────────── RELATIONSHIPS ──────────────────────────
+
+    USERS ||--o{ CONTEXTS          : owns
+    USERS ||--o{ ACCOUNTS          : owns
+    USERS ||--o{ ROUTING_RULES     : owns
+    USERS ||--o{ PEOPLE            : owns
+    USERS ||--o{ IDENTITIES        : owns
+    USERS ||--o{ TASKS             : owns
+    USERS ||--o{ EVENTS            : owns
+    USERS ||--o{ COMMITMENTS       : owns
+    USERS ||--o{ REMINDERS         : owns
+    USERS ||--o{ METRICS           : owns
+    USERS ||--o{ MEMORY_NOTES      : owns
+    USERS ||--o{ WORK_SESSIONS     : owns
+    USERS ||--o{ AUTONOMY_RULES    : owns
+    USERS ||--o{ REPORTS           : owns
+    USERS ||--o{ AUDIT_LOG         : owns
+
+    CONTEXTS ||--o{ CONTEXTS              : "parent of"
+    CONTEXTS ||--o{ ACCOUNT_CONTEXTS      : "fed by"
+    CONTEXTS ||--o{ ROUTING_RULES         : "matched by"
+    CONTEXTS ||--o{ SIGNAL_CONTEXTS       : "receives"
+    CONTEXTS ||--o{ TASKS                 : holds
+    CONTEXTS ||--o{ EVENTS                : holds
+    CONTEXTS ||--o{ COMMITMENTS           : holds
+    CONTEXTS ||--o{ METRICS               : holds
+    CONTEXTS ||--o{ MEMORY_NOTES          : scopes
+    CONTEXTS ||--o{ WORK_SESSION_CONTEXTS : "opened in"
+    CONTEXTS ||--o{ RUNS                  : scopes
+    CONTEXTS ||--o{ AUTONOMY_RULES        : governs
+    CONTEXTS |o--o{ PEOPLE                : "primary for"
+
+    ACCOUNTS ||--o{ ACCOUNT_CONTEXTS : "routes to"
+    ACCOUNTS ||--o{ SIGNALS          : produces
+
+    SIGNALS ||--o{ SIGNAL_CONTEXTS : "routed to"
+    SIGNALS ||--o{ TASKS           : "derived into"
+    SIGNALS ||--o{ EVENTS          : "derived into"
+    SIGNALS ||--o{ COMMITMENTS     : "evidence for"
+    SIGNALS ||--o{ MEMORY_NOTES    : "source of"
+
+    PEOPLE ||--o{ IDENTITIES  : "known as"
+    PEOPLE ||--o{ COMMITMENTS : "party to"
+    PEOPLE ||--o{ EVENTS      : "attends"
+
+    TASKS       ||--o{ TASKS     : "parent of"
+    TASKS       ||--o{ REMINDERS : triggers
+    EVENTS      ||--o{ REMINDERS : triggers
+    COMMITMENTS ||--o{ REMINDERS : triggers
+
+    MEMORY_NOTES ||--o{ MEMORY_NOTES : supersedes
+
+    ACTION_TYPES ||--o{ RUNS             : types
+    ACTION_TYPES ||--o{ PROPOSED_ACTIONS : types
+    ACTION_TYPES ||--o{ AUTONOMY_RULES   : governed_by
+
+    PROMPT_TEMPLATES ||--o{ RUNS : "instructs"
+
+    WORK_SESSIONS ||--o{ WORK_SESSION_CONTEXTS : scopes
+    WORK_SESSIONS ||--o{ RUNS                  : spawns
+    WORK_SESSIONS ||--o{ REPORTS               : "closes with"
+
+    RUNS             ||--o{ RUN_STEPS         : logs
+    RUNS             ||--o{ PROPOSED_ACTIONS  : proposes
+    PROPOSED_ACTIONS ||--o| EXECUTIONS        : "becomes"
+    PROPOSED_ACTIONS ||--o| AUTONOMY_EVIDENCE : "evidences"
+    AUTONOMY_RULES   ||--o{ AUTONOMY_EVIDENCE : accumulates

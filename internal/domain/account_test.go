@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/chiempham/warp/internal/domain"
+	"github.com/chiempham/warp-work/internal/domain"
 )
 
 func TestAccount_refusesUnofficialProviders(t *testing.T) {

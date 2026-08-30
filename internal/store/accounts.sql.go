@@ -13,7 +13,7 @@ import (
 )
 
 const getAccount = `-- name: GetAccount :one
-SELECT id, user_id, provider, reliability, display_name, credentials_enc, status, last_sync_at, last_error, created_at, updated_at FROM accounts WHERE id = $1
+SELECT id, user_id, provider, reliability, display_name, external_account_id, credentials_enc, scopes, sync_cursor, status, last_sync_at, last_error, created_at, updated_at FROM accounts WHERE id = $1
 `
 
 func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error) {
@@ -25,7 +25,10 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 		&i.Provider,
 		&i.Reliability,
 		&i.DisplayName,
+		&i.ExternalAccountID,
 		&i.CredentialsEnc,
+		&i.Scopes,
+		&i.SyncCursor,
 		&i.Status,
 		&i.LastSyncAt,
 		&i.LastError,
@@ -36,7 +39,7 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 }
 
 const listAccountsForContexts = `-- name: ListAccountsForContexts :many
-SELECT DISTINCT a.id, a.user_id, a.provider, a.reliability, a.display_name, a.credentials_enc, a.status, a.last_sync_at, a.last_error, a.created_at, a.updated_at
+SELECT DISTINCT a.id, a.user_id, a.provider, a.reliability, a.display_name, a.external_account_id, a.credentials_enc, a.scopes, a.sync_cursor, a.status, a.last_sync_at, a.last_error, a.created_at, a.updated_at
 FROM accounts a
 JOIN account_contexts ac ON ac.account_id = a.id
 WHERE ac.context_id = ANY ($1::uuid[])
@@ -58,7 +61,10 @@ func (q *Queries) ListAccountsForContexts(ctx context.Context, contextIds []uuid
 			&i.Provider,
 			&i.Reliability,
 			&i.DisplayName,
+			&i.ExternalAccountID,
 			&i.CredentialsEnc,
+			&i.Scopes,
+			&i.SyncCursor,
 			&i.Status,
 			&i.LastSyncAt,
 			&i.LastError,
@@ -83,7 +89,7 @@ WHERE id = $1
 
 type MarkAccountFailedParams struct {
 	ID        uuid.UUID
-	LastError string
+	LastError *string
 	UpdatedAt pgtype.Timestamptz
 }
 

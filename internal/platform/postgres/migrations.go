@@ -11,7 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/chiempham/warp/db"
+	"github.com/chiempham/warp-work/db"
 )
 
 // undefinedTable is what Postgres reports when goose has never run.

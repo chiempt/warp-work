@@ -24,7 +24,7 @@ Magic UI · Docker Compose on a single VPS.
 ## Running locally
 
 Requires Go 1.25+, a local Postgres 17 with `pgvector`, a local Redis, and pnpm. Nothing else is
-installed globally — goose, sqlc, and oapi-codegen are pinned in `go.mod` as tool dependencies and
+installed globally — goose, sqlc, and ogen are pinned in `go.mod` as tool dependencies and
 run through `go tool`.
 
 ```bash
@@ -40,7 +40,11 @@ make run-web      # http://localhost:3000
 
 Warp uses Redis database index 4 so its keys stay clear of anything else on a shared local Redis.
 
-`make help` lists every target. `make check` is what CI runs.
+The API contract is browsable at <http://localhost:8080/docs> once the api is running, and the
+document itself at `/openapi.yaml`.
+
+`make help` lists every target. `make check` is what CI runs — including `openapi-check`, which
+fails if the generated server is stale relative to the spec.
 
 If a machine has no local Postgres or Redis, `make docker-up` starts them in containers instead —
 on ports 5433 and 6380, so they cannot collide with a local install.

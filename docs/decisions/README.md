@@ -33,3 +33,5 @@ a single commit could undo.
 | [0004](0004-monorepo-layout.md) | Single repository, `apps/` layout | Accepted |
 | [0005](0005-backend-framework.md) | Go with Echo for the backend | Accepted |
 | [0006](0006-frontend-stack.md) | Next.js with shadcn/ui and Magic UI | Accepted |
+| [0007](0007-openapi-with-ogen.md) | Spec-first with ogen, and Echo keeps the outside | Accepted |
+| [0008](0008-authentication.md) | Authentication: provider identities, revocable sessions | Accepted |

@@ -15,7 +15,7 @@ import (
 const createContext = `-- name: CreateContext :one
 INSERT INTO contexts (id, user_id, parent_id, name, kind, active_hours, tone_profile, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
-RETURNING id, user_id, parent_id, name, kind, active_hours, tone_profile, is_archived, created_at, updated_at
+RETURNING id, user_id, parent_id, slug, name, kind, color, active_hours, tone_profile, position, is_archived, created_at, updated_at
 `
 
 type CreateContextParams struct {
@@ -23,9 +23,9 @@ type CreateContextParams struct {
 	UserID      uuid.UUID
 	ParentID    *uuid.UUID
 	Name        string
-	Kind        string
+	Kind        ContextKind
 	ActiveHours []byte
-	ToneProfile string
+	ToneProfile *string
 	CreatedAt   pgtype.Timestamptz
 }
 
@@ -45,10 +45,13 @@ func (q *Queries) CreateContext(ctx context.Context, arg CreateContextParams) (C
 		&i.ID,
 		&i.UserID,
 		&i.ParentID,
+		&i.Slug,
 		&i.Name,
 		&i.Kind,
+		&i.Color,
 		&i.ActiveHours,
 		&i.ToneProfile,
+		&i.Position,
 		&i.IsArchived,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -57,7 +60,7 @@ func (q *Queries) CreateContext(ctx context.Context, arg CreateContextParams) (C
 }
 
 const getContext = `-- name: GetContext :one
-SELECT id, user_id, parent_id, name, kind, active_hours, tone_profile, is_archived, created_at, updated_at FROM contexts WHERE id = $1
+SELECT id, user_id, parent_id, slug, name, kind, color, active_hours, tone_profile, position, is_archived, created_at, updated_at FROM contexts WHERE id = $1
 `
 
 func (q *Queries) GetContext(ctx context.Context, id uuid.UUID) (Context, error) {
@@ -67,10 +70,13 @@ func (q *Queries) GetContext(ctx context.Context, id uuid.UUID) (Context, error)
 		&i.ID,
 		&i.UserID,
 		&i.ParentID,
+		&i.Slug,
 		&i.Name,
 		&i.Kind,
+		&i.Color,
 		&i.ActiveHours,
 		&i.ToneProfile,
+		&i.Position,
 		&i.IsArchived,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -79,7 +85,7 @@ func (q *Queries) GetContext(ctx context.Context, id uuid.UUID) (Context, error)
 }
 
 const listContexts = `-- name: ListContexts :many
-SELECT id, user_id, parent_id, name, kind, active_hours, tone_profile, is_archived, created_at, updated_at
+SELECT id, user_id, parent_id, slug, name, kind, color, active_hours, tone_profile, position, is_archived, created_at, updated_at
 FROM contexts
 WHERE user_id = $1
   AND (NOT $2::boolean OR NOT is_archived)
@@ -104,10 +110,13 @@ func (q *Queries) ListContexts(ctx context.Context, arg ListContextsParams) ([]C
 			&i.ID,
 			&i.UserID,
 			&i.ParentID,
+			&i.Slug,
 			&i.Name,
 			&i.Kind,
+			&i.Color,
 			&i.ActiveHours,
 			&i.ToneProfile,
+			&i.Position,
 			&i.IsArchived,
 			&i.CreatedAt,
 			&i.UpdatedAt,

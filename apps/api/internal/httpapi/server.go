@@ -13,8 +13,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/chiempham/warp/internal/config"
-	"github.com/chiempham/warp/internal/platform/postgres"
+	"github.com/chiempham/warp-work/apps/api/internal/api"
+	"github.com/chiempham/warp-work/internal/config"
+	"github.com/chiempham/warp-work/internal/platform/postgres"
 )
 
 // Server owns the HTTP listener and its dependencies.
@@ -26,7 +27,11 @@ type Server struct {
 }
 
 // New wires the server. It does not listen; call Start for that.
-func New(cfg config.Config, logger *slog.Logger, pool *postgres.Pool) *Server {
+//
+// New returns an error only if the generated API server cannot be constructed,
+// which means the spec and the generated code disagree — a build-time problem
+// surfacing at startup, not a runtime condition.
+func New(cfg config.Config, logger *slog.Logger, pool *postgres.Pool) (*Server, error) {
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
@@ -35,21 +40,37 @@ func New(cfg config.Config, logger *slog.Logger, pool *postgres.Pool) *Server {
 	s := &Server{echo: e, cfg: cfg, logger: logger, pool: pool}
 
 	e.Use(defaultMiddleware(logger)...)
-	s.routes()
-	return s
+	if err := s.routes(); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
-func (s *Server) routes() {
+func (s *Server) routes() error {
 	// Operational endpoints sit outside the versioned API: they are for the
 	// container runtime, not for clients.
 	s.echo.GET("/healthz", s.live)
 	s.echo.GET("/readyz", s.ready)
 
-	v1 := s.echo.Group("/api/v1")
+	s.registerDocs()
 
-	// Every list endpoint here must be context-scoped. There is no unfiltered
-	// GET /api/v1/signals — see CLAUDE.md, hard invariant 2.
-	_ = v1
+	// Everything under /api/v1 is routed, decoded, and validated by the code
+	// ogen generates from docs/api/openapi.yaml. Echo owns the outer server —
+	// request ids, structured logging, recovery, and the operational endpoints
+	// — and hands the versioned API over wholesale. Routes are not declared
+	// here; they are declared in the spec.
+	apiServer, err := api.NewServer(
+		NewHandler(s.logger, s.pool),
+		api.WithErrorHandler(ogenErrorHandler(s.logger)),
+		api.WithNotFound(notFoundHandler),
+		api.WithMethodNotAllowed(methodNotAllowedHandler),
+	)
+	if err != nil {
+		return fmt.Errorf("build API server from the OpenAPI contract: %w", err)
+	}
+
+	s.echo.Any("/api/v1/*", echo.WrapHandler(apiServer))
+	return nil
 }
 
 // Start listens until ctx is cancelled, then drains in-flight requests.

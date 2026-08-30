@@ -11,10 +11,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/chiempham/warp/apps/api/internal/httpapi"
-	"github.com/chiempham/warp/internal/config"
-	"github.com/chiempham/warp/internal/platform/logging"
-	"github.com/chiempham/warp/internal/platform/postgres"
+	"github.com/chiempham/warp-work/apps/api/internal/httpapi"
+	"github.com/chiempham/warp-work/internal/config"
+	"github.com/chiempham/warp-work/internal/platform/logging"
+	"github.com/chiempham/warp-work/internal/platform/postgres"
 )
 
 func main() {
@@ -56,5 +56,9 @@ func run() error {
 		logger.Info("no Anthropic API key configured; model-backed features are unavailable")
 	}
 
-	return httpapi.New(cfg, logger, pool).Start(ctx)
+	server, err := httpapi.New(cfg, logger, pool)
+	if err != nil {
+		return err
+	}
+	return server.Start(ctx)
 }

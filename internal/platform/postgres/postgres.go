@@ -9,9 +9,11 @@ import (
 	"net"
 	"syscall"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	pgxvec "github.com/pgvector/pgvector-go/pgx"
 
-	"github.com/chiempham/warp/internal/config"
+	"github.com/chiempham/warp-work/internal/config"
 )
 
 // Pool is the process-wide connection pool.
@@ -26,6 +28,13 @@ func Connect(ctx context.Context, cfg config.Postgres) (*Pool, error) {
 	}
 	poolCfg.MaxConns = cfg.MaxConns
 	poolCfg.MaxConnIdleTime = cfg.MaxConnIdle
+
+	// pgvector's types are not built into pgx: every connection has to learn
+	// them, or reading memory_notes.embedding fails at runtime rather than at
+	// startup. The pool creates connections lazily, so this must be a hook.
+	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		return pgxvec.RegisterTypes(ctx, conn)
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {

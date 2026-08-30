@@ -1,6 +1,6 @@
 # Warp — developer commands.
 #
-# Tooling (goose, sqlc, oapi-codegen) is pinned in go.mod as tool dependencies,
+# Tooling (goose, sqlc, ogen) is pinned in go.mod as tool dependencies,
 # so `go tool <name>` runs the same version for everyone. Nothing needs to be
 # installed globally except Go, pnpm, and Docker.
 
@@ -49,14 +49,36 @@ tidy:
 
 # --- code generation -------------------------------------------------------
 
-## generate: regenerate sqlc queries and the OpenAPI bindings
+## generate: regenerate everything derived from the schema and the API contract
 .PHONY: generate
-generate: sqlc
+generate: sqlc openapi
 
 ## sqlc: regenerate internal/store from db/migrations and db/queries
 .PHONY: sqlc
 sqlc:
 	go tool sqlc generate
+
+## openapi: regenerate the API server from docs/api/openapi.yaml
+.PHONY: openapi
+openapi:
+	go tool ogen --clean --target apps/api/internal/api --package api docs/api/openapi.yaml
+
+## openapi-check: fail if the generated API server is stale or uncommitted
+.PHONY: openapi-check
+openapi-check: openapi
+	@dirty="$$(git status --porcelain -- apps/api/internal/api)"; \
+	if [ -n "$$dirty" ]; then \
+		echo "apps/api/internal/api does not match docs/api/openapi.yaml:"; \
+		echo "$$dirty"; \
+		echo "run 'make openapi' and commit the result"; \
+		exit 1; \
+	fi
+
+## docs: open the browsable API contract (the api must be running)
+.PHONY: docs
+docs:
+	@open http://localhost:$${API_PORT:-8080}/docs 2>/dev/null \
+		|| echo "open http://localhost:$${API_PORT:-8080}/docs"
 
 # --- database --------------------------------------------------------------
 
@@ -85,6 +107,17 @@ migrate-new:
 .PHONY: db-create
 db-create:
 	@bash infra/scripts/create-db.sh
+
+## db-reset: drop the schema and re-apply every migration (development only)
+.PHONY: db-reset
+db-reset:
+	@bash infra/scripts/reset-db.sh
+	@$(MAKE) --no-print-directory migrate-up
+
+## seed: load the development fixtures in db/seeds
+.PHONY: seed
+seed: require-db
+	@for f in db/seeds/*.sql; do echo "seeding $$f"; psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -q -f "$$f"; done
 
 .PHONY: require-db
 require-db:
@@ -143,7 +176,7 @@ lint:
 
 ## check: everything CI runs
 .PHONY: check
-check: vet test
+check: vet test openapi-check
 
 # --- containers (optional) -------------------------------------------------
 #

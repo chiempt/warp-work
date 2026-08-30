@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chiempham/warp/internal/platform/logging"
+	"github.com/chiempham/warp-work/internal/platform/logging"
 )
 
 // Warp stores and reasons in UTC everywhere. A log line in the machine's local

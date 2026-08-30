@@ -4,7 +4,7 @@
 
 **Status:** design phase, no code written yet
 **Type:** single-user personal system, built for the owner first
-**Last updated:** 2026-08-29 (stack resolved — see docs/decisions/)
+**Last updated:** 2026-08-30 (web surfaces mapped — see §13)
 
 ---
 
@@ -279,6 +279,53 @@ against evidence.
 `id`, `entity_type`, `entity_id`, `action`, `actor` (`user` | `agent` | `system`),
 `diff` (jsonb), `created_at`.
 
+### 6.5 Authentication
+
+Foundational, but listed last because it is the newest part of the design. See
+[ADR 0008](decisions/0008-authentication.md).
+
+Three things in this schema are easy to mistake for one another, so the distinction is worth
+stating plainly:
+
+| Table | Answers |
+|---|---|
+| `auth_identities` | how the **owner** signs in |
+| `accounts` | where **signals** come from, and how to keep reading them |
+| `identities` | which handles a **contact** is reachable at |
+
+`accounts` cannot serve as the login record: one Google account produces three of those rows
+(`gmail`, `gcalendar`, `gdrive`), and coupling a credential to a data source would mean
+disconnecting Gmail locks the owner out. `identities` cannot either: it hangs off `people`, and
+`people` are the counterparties in `commitments` — putting the owner there would let the system
+record that they owe themselves something.
+
+**`auth_identities`**
+`id`, `user_id`, `provider` (`google` | `zalo` | `facebook` | `passkey`), `subject`, `email`,
+`is_primary`, `linked_at`, `last_login_at`. Unique on `(provider, subject)`.
+
+One row per way in. A table rather than columns on `users` because a single way in is a single
+point of lockout: lose the Google account and there is no administrator to appeal to. A second
+row is the recovery path, and a trigger refuses to delete the last one.
+
+`subject` is the provider's immutable identifier — Google's `sub` claim, a passkey's credential
+id — never the email. An email can be changed at the provider, and matching on it would hand the
+account to whoever inherits the address. `auth_identities.email` is what the provider reported and
+is display-only; `users.email` stays canonical.
+
+Zalo Login and Facebook Login are products distinct from their messaging APIs. Signing in with
+Zalo does not make Zalo personal messages readable — see §4.
+
+**`auth_sessions`**
+`id`, `user_id`, `identity_id`, `token_hash`, `issued_at`, `last_seen_at`, `expires_at`,
+`revoked_at`, `user_agent`, `ip`.
+
+Server-side and revocable. A stateless token cannot be withdrawn: a lost laptop would mean waiting
+out the expiry or rotating the signing key for everything. Only a hash of the token is stored, so a
+database dump is not enough to sign in.
+
+Not to be confused with `work_sessions`, which is the clock-in — a business concept carrying a token
+budget, not an HTTP session.
+
 ---
 
 ## 7. The session model
@@ -360,13 +407,19 @@ against real traffic for several weeks.
 
 1. What is the confidence threshold below which a signal goes to a manual routing queue
    instead of being auto-assigned?
-2. How many consecutive clean approvals should trigger an autonomy upgrade proposal — and
-   should the threshold differ by how damaging the action is?
-3. Should commitments be extracted automatically, or confirmed by the owner on first
-   detection until precision is measured?
+2. ~~How many consecutive clean approvals should trigger an autonomy upgrade proposal — and
+   should the threshold differ by how damaging the action is?~~ **Partly answered by the schema:**
+   `action_types.risk` and `action_types.upgrade_threshold` make the threshold a property of the
+   action type. The numbers themselves are still open.
+3. ~~Should commitments be extracted automatically, or confirmed by the owner on first
+   detection until precision is measured?~~ **Answered by the schema:** `commitments.is_confirmed`
+   — confirmed on first detection.
 4. Retention: how long are raw signal payloads kept before being pruned to metadata?
-5. What is the acceptable monthly token budget, and what does the system do when it is
-   exceeded mid-session?
+5. ~~What is the acceptable monthly token budget~~, and what does the system do when it is
+   exceeded mid-session? **Partly answered by the schema:** the budget is per session
+   (`work_sessions.token_budget`), with spend recorded per run (`runs.cost_usd`,
+   `runs.tokens_in/out`). The number and the mid-session behaviour are still open.
+
 
 ---
 
@@ -378,3 +431,33 @@ weaver; it is the frame that keeps things straight.
 
 Repository, database, and namespace: `warp`.
 One-line description: *Warp — the frame that holds everything together.*
+
+---
+
+## 13. Web surfaces
+
+Decided 2026-08-30 while building the first UI pass. The full component mapping is in
+[docs/ui/conversion-mapping.md](ui/conversion-mapping.md).
+
+Seven routes, and no more without a reason: `/login`, `/` (dashboard), `/work-items`,
+`/schedule`, `/audit-log`, `/reports`, `/settings` (contexts, connections, autonomy).
+
+- **Tasks and commitments share one screen; events anchor Schedule.** All three are
+  derived work items, but events are read against a clock, not scanned as a list.
+- **Schedule has two modes, because there are two questions.** *Agenda* answers "what is
+  coming" — one clock, in order, over a seven-day horizon; it stays the default. *Calendar*
+  answers "where does this fit" — a week or month grid with duration and free space drawn
+  to scale. Both read the same three tables; the calendar is not a second source of truth.
+  Events render solid and derived deadlines dashed, so a due date is never mistaken for
+  something a second person agreed to.
+- **The dashboard is the review queue.** Approving is the most frequent action in the
+  product, so it is on the first screen, keyboard-driven (`j`/`k`/`e`/`a`/`r`), and
+  confirmed through `AlertDialog` naming the recipient.
+- **Login is a lock, not a front door.** Single user: no sign-up, no social login, no
+  emailed reset link. Each of those is a second way in to other people's correspondence.
+- **Motion never gates content.** ADR 0006 allows Magic UI at clock-in, clock-out, the
+  report, and empty states. A count-up on the dashboard stats and a staged reveal on the
+  signal feed were both built and then removed — a surface read every morning must not be
+  blank while an animation catches up, or if one fails.
+- **`auto` is unreachable in the interface**, not merely unused: the badge renders it
+  locked, and the promotion control only offers `ask → draft` (phase discipline, §9).
