@@ -82,11 +82,13 @@ export function DegradedSourceNotice({
     <div
       role="status"
       className={cn(
-        "flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm",
+        // Amber, not red. This says the answer may be short, not that something
+        // broke — and red has to keep meaning overdue, failed, or destructive.
+        "flex items-start gap-3 rounded-lg border border-warning/35 bg-warning/8 px-3 py-2.5 text-sm",
         className,
       )}
     >
-      <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
+      <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-warning" />
       <div className="space-y-1">
         <p className="font-medium text-foreground">
           {scope} may be incomplete

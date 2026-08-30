@@ -41,7 +41,17 @@ type API struct {
 
 type Log struct {
 	Level string
+	// Format is "json" or "console". JSON is the shape everything downstream
+	// reads; console is for a human watching a terminal, and is the default
+	// only in development.
+	Format string
 }
+
+// Log formats.
+const (
+	LogJSON    = "json"
+	LogConsole = "console"
+)
 
 type Postgres struct {
 	URL          string
@@ -84,6 +94,16 @@ type Credentials struct {
 // Load reads the environment and reports *every* problem at once. A process
 // that starts with half its configuration is worse than one that refuses to
 // start with a complete list of what is missing.
+// defaultLogFormat picks the format nobody has asked for explicitly. It reads
+// APP_ENV directly rather than the parsed value because the two are decided in
+// the same struct literal, and Go does not order those fields.
+func defaultLogFormat(appEnv string) string {
+	if appEnv == "" || appEnv == string(EnvDevelopment) {
+		return LogConsole
+	}
+	return LogJSON
+}
+
 func Load() (Config, error) {
 	l := &loader{}
 
@@ -95,6 +115,10 @@ func Load() (Config, error) {
 		},
 		Log: Log{
 			Level: l.oneOf("LOG_LEVEL", "info", "debug", "info", "warn", "error"),
+			// Defaults to whatever suits the reader: a person in development, a
+			// log collector everywhere else. `LOG_FORMAT` overrides either way,
+			// so a developer can reproduce production's exact output.
+			Format: l.oneOf("LOG_FORMAT", defaultLogFormat(l.optional("APP_ENV")), LogJSON, LogConsole),
 		},
 		Postgres: Postgres{
 			URL:          l.required("DATABASE_URL"),

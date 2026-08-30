@@ -284,6 +284,7 @@ const (
 	AuthProviderKindZalo     AuthProviderKind = "zalo"
 	AuthProviderKindFacebook AuthProviderKind = "facebook"
 	AuthProviderKindPasskey  AuthProviderKind = "passkey"
+	AuthProviderKindPassword AuthProviderKind = "password"
 )
 
 func (e *AuthProviderKind) Scan(src interface{}) error {
@@ -1235,6 +1236,15 @@ type AuditLog struct {
 	Actor      AuditActor
 	Diff       []byte
 	CreatedAt  pgtype.Timestamptz
+}
+
+type AuthPassword struct {
+	AuthProviderID uuid.UUID
+	Kind           AuthProviderKind
+	Hash           string
+	FailedAttempts int16
+	LockedUntil    pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
 }
 
 type AuthProvider struct {

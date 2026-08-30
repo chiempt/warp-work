@@ -12,13 +12,22 @@ import (
 
 type Querier interface {
 	AssignSignalContext(ctx context.Context, arg AssignSignalContextParams) error
+	ClearFailedLogins(ctx context.Context, authProviderID uuid.UUID) error
+	CreateAuthSession(ctx context.Context, arg CreateAuthSessionParams) (AuthSession, error)
 	// id is supplied by the application as UUIDv7 rather than taken from the
 	// column default, so rows sort by creation time. See docs/conventions.md §3.
 	// created_at and updated_at come from defaults and a trigger.
 	CreateContext(ctx context.Context, arg CreateContextParams) (Context, error)
 	GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 	GetContext(ctx context.Context, id uuid.UUID) (Context, error)
+	// GetPasswordCredential is the whole of what a password sign-in needs, in one
+	// round trip: the identity, the hash, and the lockout state.
+	//
+	// `subject` for a password identity is the normalised email — it is the login
+	// identifier, the same role the `sub` claim plays for Google.
+	GetPasswordCredential(ctx context.Context, email string) (GetPasswordCredentialRow, error)
 	GetSignalByExternalID(ctx context.Context, arg GetSignalByExternalIDParams) (Signal, error)
+	GetUserProfile(ctx context.Context, userID uuid.UUID) (UserProfile, error)
 	// IngestSignal is idempotent. Re-running a sync over items already seen returns
 	// the stored rows untouched rather than writing new ones — signals are
 	// immutable, and a database trigger enforces that too.
@@ -37,6 +46,10 @@ type Querier interface {
 	// ListUnroutedSignals feeds the router. Oldest first, so a backlog drains in
 	// the order things actually happened.
 	ListUnroutedSignals(ctx context.Context, arg ListUnroutedSignalsParams) ([]Signal, error)
+	// LiveSessionByTokenHash resolves the cookie on every authenticated request.
+	// Expiry and revocation are part of the predicate, so a caller cannot forget to
+	// check them.
+	LiveSessionByTokenHash(ctx context.Context, arg LiveSessionByTokenHashParams) (LiveSessionByTokenHashRow, error)
 	// MarkAccountFailed stops the account rather than letting it return partial
 	// data: a report must never be silently trusted when a source was down.
 	MarkAccountFailed(ctx context.Context, arg MarkAccountFailedParams) error
@@ -53,8 +66,14 @@ type Querier interface {
 	// updated_at is deliberately absent — a trigger sets it, and passing a value
 	// here would be silently overwritten.
 	MarkAccountSynced(ctx context.Context, arg MarkAccountSyncedParams) error
+	MarkProviderUsed(ctx context.Context, arg MarkProviderUsedParams) error
 	// MarkSignalProcessed sets the only column on a signal that may ever change.
 	MarkSignalProcessed(ctx context.Context, arg MarkSignalProcessedParams) error
+	// RecordFailedLogin counts the attempt and locks the credential once the count
+	// reaches the threshold. Counted in the database rather than in Redis: a
+	// lockout that evaporates when the cache restarts is not a lockout.
+	RecordFailedLogin(ctx context.Context, arg RecordFailedLoginParams) (RecordFailedLoginRow, error)
+	TouchAuthSession(ctx context.Context, arg TouchAuthSessionParams) error
 }
 
 var _ Querier = (*Queries)(nil)

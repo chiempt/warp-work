@@ -34,9 +34,18 @@ func requestLogger(logger *slog.Logger) echo.MiddlewareFunc {
 				c.Error(err)
 			}
 
+			// `c.Path()` is the route template, which keeps the field's
+			// cardinality low. It is empty when nothing matched, and a 404 that
+			// does not say what was asked for is the one log line you actually
+			// needed — so fall back to the URL for those.
+			path := c.Path()
+			if path == "" {
+				path = req.URL.Path
+			}
+
 			reqLogger.LogAttrs(c.Request().Context(), slog.LevelInfo, "request",
 				slog.String("method", req.Method),
-				slog.String("path", c.Path()),
+				slog.String("path", path),
 				slog.Int("status", c.Response().Status),
 				slog.Duration("took", time.Since(start)),
 			)
@@ -51,6 +60,7 @@ func defaultMiddleware(logger *slog.Logger) []echo.MiddlewareFunc {
 		echomw.RequestID(),
 		requestLogger(logger),
 		echomw.Recover(),
+		withClientInfo,
 		echomw.BodyLimit("2M"),
 	}
 }

@@ -94,7 +94,12 @@ export function ProposedActionStatusBadge({
 
 /**
  * Direction is the whole point of a commitment. Two values, no third case — so the two
- * read differently at a glance rather than sharing a neutral chip.
+ * read differently at a glance.
+ *
+ * Not in red. `i_owe` is a category, and roughly half of all commitments carry it;
+ * painting half the board like an alarm is how a reader stops seeing the alarms. The
+ * weight difference carries it — solid for what you owe, outlined for what is owed to
+ * you — and red stays for the one thing that is actually wrong: overdue.
  */
 export function DirectionBadge({
   direction,
@@ -102,23 +107,36 @@ export function DirectionBadge({
   direction: CommitmentDirection
 }) {
   return direction === "i_owe" ? (
-    <Badge variant="destructive" className="font-normal">
+    <Badge variant="secondary" className="font-medium">
       I owe
     </Badge>
   ) : (
-    <Badge variant="outline" className="font-normal">
+    <Badge variant="outline" className="font-normal text-muted-foreground">
       Owed to me
     </Badge>
   )
 }
 
+/**
+ * A scale, so the three steps have to be separable at a glance. Low and medium were both
+ * outlined chips and read as the same thing, which made the scale decorative.
+ */
 export function RiskBadge({ risk }: { risk: ActionRisk }) {
-  const variant: Record<ActionRisk, Variant> = {
-    low: "ghost",
-    medium: "outline",
-    high: "destructive",
+  if (risk === "high") {
+    return <Chip variant="destructive">high risk</Chip>
   }
-  return <Chip variant={variant[risk]}>{risk} risk</Chip>
+  if (risk === "medium") {
+    return (
+      <Chip variant="outline" className="border-warning/50 font-normal text-warning">
+        medium risk
+      </Chip>
+    )
+  }
+  return (
+    <Chip variant="ghost" className="text-muted-foreground">
+      low risk
+    </Chip>
+  )
 }
 
 export function AutonomyBadge({ level }: { level: AutonomyLevel }) {

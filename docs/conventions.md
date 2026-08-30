@@ -171,8 +171,15 @@ a `signal` is called a signal — in Go, in SQL, in TSX, and in the interface.
   whether a retry is safe.
 - A failing connector sets `accounts.status` and `accounts.last_error` and stops. It never falls back
   to a degraded fetch that silently returns partial data.
-- `log/slog`, JSON handler, one event per line, always carrying `context_id`, `session_id`, and
+- `log/slog`, one event per line, always carrying `context_id`, `session_id`, and
   `run_id` where they exist. One logger, injected — no package-level global.
+- **JSON is the output; console is a concession.** `LOG_FORMAT` selects the handler, and
+  it defaults to `console` only when `APP_ENV=development`. Everywhere else the shape is
+  JSON, because that is what a collector reads and what an incident is reconstructed from.
+  The console handler is `lmittmann/tint` — a slog handler with no dependencies of its
+  own — and it emits the same events with the same fields, coloured and aligned. Both
+  formats timestamp in UTC: a local-zone line is the one place that convention silently
+  breaks, and it breaks exactly when someone correlates across services.
 - **Never log at `info` or above:** raw signal payloads, credentials, draft content, or a person's
   contact details. Payload contents are debug-level and redacted by default.
 - `run_steps` is the agent debugging trail, not the log file. Every tool call gets a row with its

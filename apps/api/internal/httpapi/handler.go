@@ -11,6 +11,8 @@ import (
 	"github.com/ogen-go/ogen/ogenerrors"
 
 	"github.com/chiempham/warp-work/apps/api/internal/api"
+	"github.com/chiempham/warp-work/internal/auth"
+	"github.com/chiempham/warp-work/internal/config"
 	"github.com/chiempham/warp-work/internal/domain"
 	"github.com/chiempham/warp-work/internal/platform/postgres"
 )
@@ -25,13 +27,15 @@ import (
 type Handler struct {
 	api.UnimplementedHandler
 
+	cfg    config.Config
 	pool   *postgres.Pool
 	logger *slog.Logger
+	auth   *auth.Service
 }
 
 // NewHandler wires the API implementation.
-func NewHandler(logger *slog.Logger, pool *postgres.Pool) *Handler {
-	return &Handler{pool: pool, logger: logger}
+func NewHandler(cfg config.Config, logger *slog.Logger, pool *postgres.Pool, authSvc *auth.Service) *Handler {
+	return &Handler{cfg: cfg, pool: pool, logger: logger, auth: authSvc}
 }
 
 var _ api.Handler = (*Handler)(nil)

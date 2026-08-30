@@ -29,7 +29,8 @@ import {
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { ContextChip } from "@/components/warp/context-chip"
-import { contexts, NOW, openSession, runs } from "@/lib/mock/data"
+import { useSession } from "@/components/warp/session-provider"
+import { contexts, NOW, runs } from "@/lib/mock/data"
 import { formatDuration, formatTime } from "@/lib/format"
 
 const runningNow = runs.filter((r) => r.status === "running").length
@@ -42,11 +43,13 @@ const runningNow = runs.filter((r) => r.status === "running").length
  * and the counters stream from it.
  */
 export function SessionBar() {
-  const [session, setSession] = React.useState<typeof openSession | null>(openSession)
-  const [scope, setScope] = React.useState<string[]>(openSession.contextIds)
+  const { session, start, end } = useSession()
+  const [scope, setScope] = React.useState<string[]>(session?.contextIds ?? [])
 
   if (!session) {
-    return <StartSession scope={scope} onScope={setScope} onStart={() => setSession(openSession)} />
+    return (
+      <StartSession scope={scope} onScope={setScope} onStart={() => start(scope)} />
+    )
   }
 
   const elapsed = formatDuration(session.startedAt, NOW)
@@ -112,7 +115,7 @@ export function SessionBar() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep working</AlertDialogCancel>
-            <AlertDialogAction onClick={() => setSession(null)}>
+            <AlertDialogAction onClick={end}>
               End session and generate report
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -131,15 +131,25 @@ build:
 	go build -o bin/api ./apps/api/cmd/api
 	go build -o bin/worker ./apps/worker/cmd/worker
 
+# Both services build to a real binary and are exec'd, rather than run under
+# `go run`. `go run` starts the service as a *child* and does not forward its
+# own death: kill it, close the terminal, or reload the editor window, and the
+# service is orphaned still holding its port — so the next start fails to bind
+# and the one before it dies at a moment nobody connected to anything. `exec`
+# replaces make's shell with the service itself, so there is one process, and
+# Ctrl-C reaches the signal handler that drains it.
+
 ## run-api: run the HTTP service
 .PHONY: run-api
 run-api:
-	go run ./apps/api/cmd/api
+	@go build -o bin/api ./apps/api/cmd/api
+	@exec ./bin/api
 
 ## run-worker: run the background worker
 .PHONY: run-worker
 run-worker:
-	go run ./apps/worker/cmd/worker
+	@go build -o bin/worker ./apps/worker/cmd/worker
+	@exec ./bin/worker
 
 ## run-web: run the Next.js frontend
 .PHONY: run-web

@@ -69,16 +69,14 @@ export default function DashboardPage() {
 
       <DegradedSourceNotice scope="Today's picture" />
 
+      {/* Ordered by how soon it bites, left to right: what is already late, what needs a
+          decision now, what lands today, then the standing total. An earlier order led
+          with the total, which is the one number that does not change what you do next. */}
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="I owe"
-          value={iOwe.length}
-          caption="Open promises made by you, across every context."
-        />
         <StatCard
           label="Overdue"
           value={overdue.length}
-          tone={overdue.length > 0 ? "warning" : "default"}
+          tone={overdue.length > 0 ? "urgent" : "default"}
           caption="Past their due date and still open."
         />
         <StatCard
@@ -90,6 +88,11 @@ export default function DashboardPage() {
           label="Due today"
           value={dueToday.length}
           caption="Tasks with a due date inside today, Asia/Ho_Chi_Minh."
+        />
+        <StatCard
+          label="I owe"
+          value={iOwe.length}
+          caption="Open promises made by you, across every context."
         />
       </section>
 

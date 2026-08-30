@@ -18,7 +18,8 @@ export function StatCard({
   label: string
   value: number
   caption: string
-  tone?: "default" | "warning"
+  /** `urgent` is red, and red means already late — not merely worth a look. */
+  tone?: "default" | "urgent"
   suffix?: string
 }) {
   return (
@@ -30,7 +31,7 @@ export function StatCard({
         <p
           className={cn(
             "mt-1 flex items-baseline gap-1 text-2xl font-semibold tabular-nums",
-            tone === "warning" && "text-destructive",
+            tone === "urgent" && "text-destructive",
           )}
         >
           {value.toLocaleString("en-GB")}

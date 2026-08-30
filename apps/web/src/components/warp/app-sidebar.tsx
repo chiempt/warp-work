@@ -25,52 +25,68 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
 } from "@/components/ui/sidebar"
-import { ContextChip } from "@/components/warp/context-chip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { CommandMenu } from "@/components/warp/command-menu"
+import { ContextChip } from "@/components/warp/context-chip"
+import { useSession } from "@/components/warp/session-provider"
 import { cn } from "@/lib/utils"
 import { commitments, contexts, proposedActions, tasks } from "@/lib/mock/data"
 
+/**
+ * Every badge in this file states what it counts.
+ *
+ * An earlier version put three different quantities in the same right-hand slot —
+ * actions awaiting review, open tasks, open commitments — rendered identically. A number
+ * that looks authoritative and means something different on each row is worse than no
+ * number: it is read at a glance and it is read wrong.
+ */
 const nav = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboardIcon },
-  { href: "/work-items", label: "Work items", icon: ListChecksIcon },
+  {
+    href: "/",
+    label: "Dashboard",
+    icon: LayoutDashboardIcon,
+    count: () => proposedActions.filter((a) => a.status === "pending").length,
+    counts: "drafted actions waiting for your review",
+  },
+  {
+    href: "/work-items",
+    label: "Work items",
+    icon: ListChecksIcon,
+    count: () =>
+      tasks.filter((t) => t.status !== "done" && t.status !== "dropped").length,
+    counts: "tasks still open",
+  },
   { href: "/schedule", label: "Schedule", icon: CalendarDaysIcon },
   { href: "/audit-log", label: "Audit log", icon: ScrollTextIcon },
   { href: "/reports", label: "Reports", icon: FileTextIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ] as const
 
-const pendingReview = proposedActions.filter((a) => a.status === "pending").length
-
-function badgeFor(href: string): number | null {
-  if (href === "/") return pendingReview || null
-  if (href === "/work-items") {
-    return tasks.filter((t) => t.status !== "done" && t.status !== "dropped").length
-  }
-  return null
-}
-
 export function AppSidebar() {
   const pathname = usePathname()
+  const { session, scope } = useSession()
+
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href)
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="gap-2">
-        <div className="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:px-0">
+        {/* The mark and the name. The tagline used to live here and was clipped to
+            "…everything toge…" at this width — a line nobody could finish reading,
+            on a surface opened every morning. */}
+        <div className="flex items-center gap-2 px-2 py-1 group-data-[collapsible=icon]:px-0">
           <span
             aria-hidden
             className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary font-mono text-[11px] font-semibold text-primary-foreground"
           >
             W
           </span>
-          <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-sm font-semibold leading-tight">Warp</p>
-            <p className="truncate text-xs text-muted-foreground">
-              The frame that holds everything together
-            </p>
-          </div>
+          <span className="text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+            Warp
+          </span>
         </div>
         <CommandMenu />
       </SidebarHeader>
@@ -80,7 +96,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {nav.map((item) => {
-                const count = badgeFor(item.href)
+                const count = "count" in item ? item.count() : 0
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
@@ -93,7 +109,20 @@ export function AppSidebar() {
                         </Link>
                       }
                     />
-                    {count ? <SidebarMenuBadge>{count}</SidebarMenuBadge> : null}
+                    {count > 0 && "counts" in item ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <SidebarMenuBadge className="cursor-help">
+                              {count}
+                            </SidebarMenuBadge>
+                          }
+                        />
+                        <TooltipContent side="right">
+                          {count} {item.counts}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
                   </SidebarMenuItem>
                 )
               })}
@@ -101,18 +130,35 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <SidebarSeparator className="group-data-[collapsible=icon]:hidden" />
+
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <SidebarGroupLabel>Contexts</SidebarGroupLabel>
+          <SidebarGroupLabel>
+            Contexts
+            <span className="ml-auto font-normal text-muted-foreground/70">
+              {session ? `${scope.length} in session` : "no session"}
+            </span>
+          </SidebarGroupLabel>
+
           <SidebarGroupContent>
             <SidebarMenu>
               {contexts.map((context) => {
+                const nested = context.parentId !== null
+                const inScope = scope.includes(context.id)
                 const owed = commitments.filter(
                   (c) => c.contextId === context.id && c.status === "open",
                 ).length
+
                 return (
                   <SidebarMenuItem key={context.id}>
                     <SidebarMenuButton
-                      className="h-7"
+                      className={cn(
+                        "h-7",
+                        // A child sits inside its parent's rail rather than on a
+                        // slightly different indent nobody can measure by eye.
+                        nested && "ml-3 border-l border-sidebar-border pl-2.5",
+                        !inScope && session && "opacity-55",
+                      )}
                       render={
                         <Link
                           href={{
@@ -122,15 +168,35 @@ export function AppSidebar() {
                         >
                           <ContextChip
                             contextId={context.id}
-                            className={cn(
-                              "text-[13px]",
-                              context.parentId && "pl-3",
-                            )}
+                            className="text-[13px]"
                           />
                         </Link>
                       }
                     />
-                    {owed ? <SidebarMenuBadge>{owed}</SidebarMenuBadge> : null}
+
+                    {/* Not a count. Whether agents may touch this context right now
+                        is the rule the whole session model turns on, and this list
+                        is where it belongs.
+
+                        Only the contexts in scope are marked. Labelling the other
+                        five "quiet" as well says the same thing five times and
+                        buries the two rows that matter — the dimming above already
+                        carries it, and the tooltip explains either state. */}
+                    {session && inScope ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <SidebarMenuBadge className="cursor-help font-normal text-muted-foreground">
+                              live
+                            </SidebarMenuBadge>
+                          }
+                        />
+                        <TooltipContent side="right" className="max-w-56">
+                          In this session — agents may read and draft here. {owed} open
+                          commitment{owed === 1 ? "" : "s"}.
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
                   </SidebarMenuItem>
                 )
               })}
@@ -140,22 +206,34 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-          <p className="truncate">chiem.pt@baohiemtasco.vn</p>
-          <p className="truncate">Asia/Ho_Chi_Minh · phase 1</p>
-        </div>
+        {/* One row, not three stacked grey lines. The timezone and the phase are on
+            the sign-in screen and in settings; repeating them here every day buys
+            nothing. */}
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="Sign out"
-              className="text-muted-foreground"
-              render={
-                <Link href="/login">
-                  <LogOutIcon />
-                  <span>Sign out</span>
-                </Link>
-              }
-            />
+          <SidebarMenuItem className="flex items-center gap-2 px-2 py-1 group-data-[collapsible=icon]:px-0">
+            <span
+              aria-hidden
+              className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground"
+            >
+              C
+            </span>
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+              chiem.pt@baohiemtasco.vn
+            </span>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Link
+                    href="/login"
+                    aria-label="Sign out"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden"
+                  >
+                    <LogOutIcon className="size-3.5" />
+                  </Link>
+                }
+              />
+              <TooltipContent side="right">Sign out</TooltipContent>
+            </Tooltip>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

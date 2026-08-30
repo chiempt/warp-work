@@ -36,7 +36,7 @@ func run() error {
 		return err
 	}
 
-	logger := logging.New(cfg.Log.Level)
+	logger := logging.New(cfg.Log.Level, cfg.Log.Format)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

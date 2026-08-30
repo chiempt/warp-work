@@ -56,6 +56,7 @@ one.
 | Connector identity | Vendor marks in `source-marks.tsx` | Settings → Connections only. Picking an account is the one place a logo carries information. |
 | Autonomy level | `AutonomyBadge` + `Progress` | Evidence is the argument for a level, so it sits beside it. |
 | Navigation | `Sidebar` + `Command` (⌘K) | Long sittings; changing context should not need the mouse. |
+| Session scope | `live` marker on the sidebar's context list | The rule deciding what agents may touch, shown next to the contexts it governs — read from `SessionProvider`, so clocking out clears it. |
 | Outbound / destructive | `AlertDialog` | Never `Dialog`. Approving sends real mail to a real client. |
 
 ## 3. Where Magic UI applies — and where it was cut
@@ -118,6 +119,38 @@ CLI — reapply it: `dot-pattern` had `Math.random()` during render, which the R
 Compiler lint rejects as impure. It has since been deleted along with the diagram, but
 `warp-threads` uses the same integer-mixing seed for its thread jitter, for the same
 reason: the weave has to be identical on the server and the client.
+
+### 3.2 Colour
+
+One rule: **a hue means exactly one thing, everywhere.** Colour is the scarcest signal on
+a dense screen, and it only works while it is scarce.
+
+| Hue | Means | Where |
+|---|---|---|
+| `destructive` | Already late, failed, or about to destroy something | Overdue dates, a blocked task, a failing account, `AlertDialog` confirmations |
+| `warning` | Worth a look, not broken | `DegradedSourceNotice`, medium-risk actions, the `unofficial` reliability tier |
+| `context-work` / `-study` / `-personal` | Which life area | Context markers and calendar blocks only |
+| neutral | Everything else | |
+
+Red had been doing five jobs: validation errors, failures, overdue dates, *"may be
+incomplete"*, and the `i_owe` direction. The last two were the damage.
+
+- **"May be incomplete" is not a failure.** It says the answer may be short. It is amber,
+  which is why the `warning` token exists — without it that state lands on red and red
+  stops meaning anything.
+- **`i_owe` is a category, not an alarm.** Roughly half of all commitments carry it, so
+  painting half the board red is how a reader stops seeing red at all. Direction now reads
+  through weight — solid for what you owe, outlined for what is owed to you — and on the
+  commitments board the only red left is the one commitment that is actually overdue.
+- **Risk is a scale**, so its three steps have to be separable: muted, amber, red. Low and
+  medium were both outlined chips, which made the scale decorative.
+
+### 3.3 Order
+
+Lists are ordered by how soon they bite, not by how they were modelled. The dashboard
+tiles read **Overdue · Awaiting review · Due today · I owe**: what is already late, what
+needs a decision now, what lands today, then the standing total. An earlier order led with
+the total, which is the one number that does not change what you do next.
 
 ## 4. Invariants the interface has to hold
 
