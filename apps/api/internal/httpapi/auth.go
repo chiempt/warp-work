@@ -20,11 +20,12 @@ import (
 // unauthenticated and nothing says why.
 const sessionCookieName = "warp_session"
 
-// Register creates the owner and signs them in.
+// Register creates a user and signs them in.
 //
-// Warp has one owner, so this succeeds at most once for the life of the
-// installation. A second attempt is a 409, not a second account — the check
-// and the four inserts happen in one transaction inside the service.
+// Unrestricted, because Warp runs locally: there is no stranger to keep out.
+// The only conflict left is an email that is already registered, which comes
+// from the unique constraint rather than a prior check — so two simultaneous
+// registrations cannot both pass and then collide.
 func (h *Handler) Register(ctx context.Context, req *api.RegisterRequest) (api.RegisterRes, error) {
 	session, err := h.auth.Register(ctx, auth.RegisterParams{
 		Email:       req.Email,
@@ -33,10 +34,10 @@ func (h *Handler) Register(ctx context.Context, req *api.RegisterRequest) (api.R
 	}, clientInfoFrom(ctx))
 
 	switch {
-	case errors.Is(err, auth.ErrOwnerExists):
+	case errors.Is(err, auth.ErrEmailTaken):
 		return &api.ErrorEnvelope{Error: api.Error{
-			Code:    "owner_exists",
-			Message: "this installation already has an owner; sign in instead",
+			Code:    "email_taken",
+			Message: "an account with that email already exists",
 		}}, nil
 
 	case errors.Is(err, auth.ErrInvalidInput):

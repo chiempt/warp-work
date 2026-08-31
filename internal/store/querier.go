@@ -56,14 +56,6 @@ type Querier interface {
 	// Expiry and revocation are part of the predicate, so a caller cannot forget to
 	// check them.
 	LiveSessionByTokenHash(ctx context.Context, arg LiveSessionByTokenHashParams) (LiveSessionByTokenHashRow, error)
-	// LockRegistration serialises registration attempts.
-	//
-	// "Is there already an owner?" cannot be answered safely with a plain SELECT:
-	// at READ COMMITTED two concurrent transactions both see none and both insert.
-	// A transaction-scoped advisory lock closes that window without a schema
-	// constraint that would foreclose multi-user later. Released on commit or
-	// rollback, automatically.
-	LockRegistration(ctx context.Context) error
 	// MarkAccountFailed stops the account rather than letting it return partial
 	// data: a report must never be silently trusted when a source was down.
 	MarkAccountFailed(ctx context.Context, arg MarkAccountFailedParams) error
@@ -83,7 +75,6 @@ type Querier interface {
 	MarkProviderUsed(ctx context.Context, arg MarkProviderUsedParams) error
 	// MarkSignalProcessed sets the only column on a signal that may ever change.
 	MarkSignalProcessed(ctx context.Context, arg MarkSignalProcessedParams) error
-	OwnerExists(ctx context.Context) (bool, error)
 	// RecordFailedLogin counts the attempt and locks the credential once the count
 	// reaches the threshold. Counted in the database rather than in Redis: a
 	// lockout that evaporates when the cache restarts is not a lockout.

@@ -265,22 +265,6 @@ func (q *Queries) LiveSessionByTokenHash(ctx context.Context, arg LiveSessionByT
 	return i, err
 }
 
-const lockRegistration = `-- name: LockRegistration :exec
-SELECT pg_advisory_xact_lock(4919)
-`
-
-// LockRegistration serialises registration attempts.
-//
-// "Is there already an owner?" cannot be answered safely with a plain SELECT:
-// at READ COMMITTED two concurrent transactions both see none and both insert.
-// A transaction-scoped advisory lock closes that window without a schema
-// constraint that would foreclose multi-user later. Released on commit or
-// rollback, automatically.
-func (q *Queries) LockRegistration(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, lockRegistration)
-	return err
-}
-
 const markProviderUsed = `-- name: MarkProviderUsed :exec
 UPDATE auth_providers SET last_login_at = $2 WHERE id = $1
 `
@@ -293,17 +277,6 @@ type MarkProviderUsedParams struct {
 func (q *Queries) MarkProviderUsed(ctx context.Context, arg MarkProviderUsedParams) error {
 	_, err := q.db.Exec(ctx, markProviderUsed, arg.ID, arg.LastLoginAt)
 	return err
-}
-
-const ownerExists = `-- name: OwnerExists :one
-SELECT EXISTS (SELECT 1 FROM users)
-`
-
-func (q *Queries) OwnerExists(ctx context.Context) (bool, error) {
-	row := q.db.QueryRow(ctx, ownerExists)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
 }
 
 const recordFailedLogin = `-- name: RecordFailedLogin :one

@@ -174,8 +174,11 @@ this section are current as of 2026-08-29; the skill is authoritative over anyth
   Ask before adding a dependency that runs as its own process.
 - Prefer the standard library and the libraries already named in ADR 0005. A new Go module needs a
   reason beyond convenience.
-- This is a single-user system. Do not build multi-user, teams, permissions, or billing. `user_id`
-  columns exist so that stays a future option, not a current feature.
+- Registration is unrestricted — Warp runs locally, so there is no stranger to keep out. But do not
+  build multi-user *behaviour*: no teams, no sharing, no permissions, no billing. `user_id` columns
+  exist so that stays a future option, not a current feature.
+- `action_types` and `prompt_templates` carry no `user_id` and are shared config. Do not add a
+  feature that lets one account's edit change another's agent behaviour without fixing that first.
 - Agents draft; the owner decides. Do not add a feature that removes the review step.
 - If a task depends on an unresolved question from [docs/open-questions.md](docs/open-questions.md),
   pick a defensible default, mark it `TODO(open-question-N)`, and say which default you chose and why.

@@ -29,18 +29,33 @@ help:
 
 # --- setup -----------------------------------------------------------------
 
-## setup: one-time machine setup — env file, database, migrations
+## setup: machine setup — env file, database, migrations. Safe to re-run.
 .PHONY: setup
 setup: env db-create migrate-up
-	@echo "ready: make run-api"
+	@echo
+	@echo "ready. next:"
+	@echo "  make run-api"
+	@echo "  curl -X POST http://localhost:8080/api/v1/auth/register \\"
+	@echo "    -H 'content-type: application/json' \\"
+	@echo "    -d '{\"email\":\"you@example.com\",\"password\":\"a-long-enough-password\",\"displayName\":\"Your Name\"}'"
+	@echo "  make seed"
 
 ## env: create infra/.env from the example with a fresh encryption key
+#
+# Keeping an existing file is the correct outcome, not a failure: overwriting it
+# would discard the encryption key, and every stored credential with it. So this
+# is a no-op when the file is already there, which is what lets `make setup` be
+# re-run safely.
 .PHONY: env
 env:
-	@test ! -f $(ENV_FILE) || { echo "$(ENV_FILE) already exists; not overwriting"; exit 1; }
-	@sed 's|^CREDENTIALS_ENCRYPTION_KEY=.*|CREDENTIALS_ENCRYPTION_KEY='"$$(openssl rand -base64 32)"'|' \
-		infra/.env.example > $(ENV_FILE)
-	@echo "wrote $(ENV_FILE) with a generated encryption key"
+	@if [ -f $(ENV_FILE) ]; then \
+		echo "$(ENV_FILE) exists; keeping it"; \
+	else \
+		sed 's|^CREDENTIALS_ENCRYPTION_KEY=.*|CREDENTIALS_ENCRYPTION_KEY='"$$(openssl rand -base64 32)"'|' \
+			infra/.env.example > $(ENV_FILE); \
+		chmod 600 $(ENV_FILE); \
+		echo "wrote $(ENV_FILE) with a generated encryption key"; \
+	fi
 
 ## tidy: sync go.mod and go.sum
 .PHONY: tidy

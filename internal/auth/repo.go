@@ -27,8 +27,6 @@ type Repository interface {
 
 	// Registration. These run together inside one transaction — see
 	// Store.InTx and Service.Register.
-	LockRegistration(ctx context.Context) error
-	OwnerExists(ctx context.Context) (bool, error)
 	CreateUser(ctx context.Context, id uuid.UUID) (store.User, error)
 	CreateUserProfile(ctx context.Context, arg store.CreateUserProfileParams) (store.UserProfile, error)
 	CreateAuthProvider(ctx context.Context, arg store.CreateAuthProviderParams) (store.AuthProvider, error)

@@ -100,8 +100,11 @@ type Invoker interface {
 	Login(ctx context.Context, request *LoginRequest) (LoginRes, error)
 	// Register invokes register operation.
 	//
-	// Warp has exactly one owner (see §2 of the context document). This endpoint therefore succeeds at
-	// most once: a second attempt is a 409, not a second account. It is not a public sign-up.
+	// Unrestricted. Warp runs on the owner's own machine, so there is no stranger to keep out.
+	//
+	// What remains out of scope is multi-user behaviour — no teams, no sharing, no permissions. Two
+	// tables, `action_types` and `prompt_templates`, carry no `user_id` and would be shared config if a
+	// second account existed.
 	//
 	// POST /api/v1/auth/register
 	Register(ctx context.Context, request *RegisterRequest) (RegisterRes, error)
@@ -1319,8 +1322,11 @@ func (c *Client) sendLogin(ctx context.Context, request *LoginRequest) (res Logi
 
 // Register invokes register operation.
 //
-// Warp has exactly one owner (see §2 of the context document). This endpoint therefore succeeds at
-// most once: a second attempt is a 409, not a second account. It is not a public sign-up.
+// Unrestricted. Warp runs on the owner's own machine, so there is no stranger to keep out.
+//
+// What remains out of scope is multi-user behaviour — no teams, no sharing, no permissions. Two
+// tables, `action_types` and `prompt_templates`, carry no `user_id` and would be shared config if a
+// second account existed.
 //
 // POST /api/v1/auth/register
 func (c *Client) Register(ctx context.Context, request *RegisterRequest) (RegisterRes, error) {

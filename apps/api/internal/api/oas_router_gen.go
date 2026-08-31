@@ -787,7 +787,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							switch method {
 							case "POST":
 								r.name = RegisterOperation
-								r.summary = "Create the owner account with an email and password"
+								r.summary = "Create an account with an email and password"
 								r.operationID = "register"
 								r.operationGroup = ""
 								r.pathPattern = "/api/v1/auth/register"

@@ -111,8 +111,11 @@ func (UnimplementedHandler) Login(ctx context.Context, req *LoginRequest) (r Log
 
 // Register implements register operation.
 //
-// Warp has exactly one owner (see §2 of the context document). This endpoint therefore succeeds at
-// most once: a second attempt is a 409, not a second account. It is not a public sign-up.
+// Unrestricted. Warp runs on the owner's own machine, so there is no stranger to keep out.
+//
+// What remains out of scope is multi-user behaviour — no teams, no sharing, no permissions. Two
+// tables, `action_types` and `prompt_templates`, carry no `user_id` and would be shared config if a
+// second account existed.
 //
 // POST /api/v1/auth/register
 func (UnimplementedHandler) Register(ctx context.Context, req *RegisterRequest) (r RegisterRes, _ error) {

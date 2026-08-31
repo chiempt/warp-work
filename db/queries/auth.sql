@@ -57,19 +57,6 @@ UPDATE auth_providers SET last_login_at = $2 WHERE id = $1;
 -- name: GetUserProfile :one
 SELECT * FROM user_profiles WHERE user_id = $1;
 
--- LockRegistration serialises registration attempts.
---
--- "Is there already an owner?" cannot be answered safely with a plain SELECT:
--- at READ COMMITTED two concurrent transactions both see none and both insert.
--- A transaction-scoped advisory lock closes that window without a schema
--- constraint that would foreclose multi-user later. Released on commit or
--- rollback, automatically.
--- name: LockRegistration :exec
-SELECT pg_advisory_xact_lock(4919);
-
--- name: OwnerExists :one
-SELECT EXISTS (SELECT 1 FROM users);
-
 -- name: CreateUser :one
 INSERT INTO users (id) VALUES ($1) RETURNING *;
 

@@ -2,8 +2,12 @@
 # Provision Warp's role, database, and the vector extension on a local Postgres,
 # then write the resulting DATABASE_URL into infra/.env.
 #
-# Run once per machine. Safe to re-run: it rotates the role's password and
-# leaves existing data alone.
+# Safe to re-run: if the DATABASE_URL already in infra/.env connects, nothing is
+# touched. Pass ROTATE=1 to force a new password.
+#
+# Rotating on every run would be worse than useless — it invalidates any other
+# tool pointed at the same database (psql history, a GUI client, a running
+# service) for no reason.
 set -euo pipefail
 
 ENV_FILE="infra/.env"
@@ -24,6 +28,16 @@ if ! psql_super -d postgres -tAc 'SELECT 1' >/dev/null 2>&1; then
     echo "error: cannot reach Postgres at $PGHOST:$PGPORT as '$PGSUPERUSER'." >&2
     echo "       Start it, or set PGHOST/PGPORT/PGSUPERUSER." >&2
     exit 1
+fi
+
+# If what is already configured works, leave it alone.
+existing_url="$(grep -E '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2- || true)"
+if [[ "${ROTATE:-0}" != "1" && -n "$existing_url" ]]; then
+    if psql "$existing_url" -tAc 'SELECT 1' >/dev/null 2>&1; then
+        echo "database already reachable with the configured DATABASE_URL; nothing to do"
+        echo "  (re-run with ROTATE=1 to issue a new password)"
+        exit 0
+    fi
 fi
 
 password="$(openssl rand -hex 24)"

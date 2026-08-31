@@ -31,8 +31,22 @@ matters, and acts within limits you set.
 
 ## 2. Who it's for
 
-One user. The owner. Multi-user support is explicitly out of scope, but every table carries
-`user_id` so the schema does not need rewriting later.
+One user in practice — the owner. Registration is unrestricted, because Warp runs on the owner's own
+machine and there is no stranger to keep out.
+
+What stays out of scope is multi-user *behaviour*: no teams, no sharing, no permissions. Most tables
+carry `user_id`, and the rest reach it through a foreign key (`signals` → `accounts`, `runs` →
+`work_sessions`), so data is isolated per account without further work.
+
+Two tables are the exception and would be **shared** if a second account existed:
+
+| Table | What it holds |
+|---|---|
+| `action_types` | what an agent may attempt, with `risk` and `upgrade_threshold` |
+| `prompt_templates` | versioned prompts, with `model` and `max_tokens` |
+
+Editing either changes agent behaviour for every account. That is acceptable while this is one
+person's tool; it is the first thing to fix if it ever stops being one.
 
 The owner's life areas, which map directly onto the `contexts` table:
 

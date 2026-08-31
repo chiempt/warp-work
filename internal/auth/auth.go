@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/chiempham/warp-work/internal/store"
@@ -30,9 +31,10 @@ var (
 	// ErrNoSession means the presented token is unknown, expired, or revoked.
 	ErrNoSession = errors.New("no live session")
 
-	// ErrOwnerExists means registration ran a second time. Warp has one owner;
-	// a second attempt is a conflict, not a second account.
-	ErrOwnerExists = errors.New("an owner already exists")
+	// ErrEmailTaken means an account with that email already exists. Raised
+	// from the unique constraints rather than a prior SELECT, so two
+	// simultaneous registrations cannot both pass a check and then collide.
+	ErrEmailTaken = errors.New("email is already registered")
 
 	// ErrInvalidInput is a value the contract could not reject on its own —
 	// a display name that is only whitespace, for instance.
@@ -266,22 +268,18 @@ type RegisterParams struct {
 	DisplayName string
 }
 
-// Register creates the owner and signs them in.
+// Register creates a user and signs them in.
 //
-// Four tables have to be written together — users, user_profiles,
-// auth_providers, auth_passwords — and a partial write is not recoverable: an
-// identity without a password cannot sign in, and cannot be created again
-// because the email is already taken. So the whole thing is one transaction.
+// Registration is unrestricted: Warp runs on the owner's own machine, so there
+// is no stranger to keep out. What stays out of scope is multi-user
+// *behaviour* — no teams, no sharing, no permissions — and two tables,
+// `action_types` and `prompt_templates`, carry no `user_id` and would be shared
+// if a second account ever existed.
 //
-// Two decisions inside it are worth knowing about:
-//
-//   - The "is there already an owner" check is guarded by an advisory lock.
-//     A plain SELECT is not enough: at READ COMMITTED two concurrent
-//     registrations both see no owner and both insert.
-//   - The password is hashed *after* that check, inside the transaction.
-//     Hashing first would keep the lock shorter, but it would also mean every
-//     rejected attempt costs a full argon2 run — which is a way to make the
-//     server do expensive work on demand.
+// Four tables are written together — users, user_profiles, auth_providers,
+// auth_passwords — and a partial write is not recoverable: an identity without
+// a password cannot sign in, and cannot be created again because the email is
+// already taken. So the whole thing is one transaction.
 func (s *Service) Register(ctx context.Context, p RegisterParams, sc SignInContext) (Session, error) {
 	now := s.clock()
 
@@ -294,18 +292,6 @@ func (s *Service) Register(ctx context.Context, p RegisterParams, sc SignInConte
 	var session Session
 
 	err := s.store.InTx(ctx, func(repo Repository) error {
-		if err := repo.LockRegistration(ctx); err != nil {
-			return fmt.Errorf("lock registration: %w", err)
-		}
-
-		exists, err := repo.OwnerExists(ctx)
-		if err != nil {
-			return fmt.Errorf("check for an existing owner: %w", err)
-		}
-		if exists {
-			return ErrOwnerExists
-		}
-
 		hash, err := HashPassword(p.Password, s.params)
 		if err != nil {
 			return err
@@ -356,13 +342,28 @@ func (s *Service) Register(ctx context.Context, p RegisterParams, sc SignInConte
 		}
 
 		// Opened inside the same transaction, so registering either produces a
-		// usable session or leaves nothing behind at all.
+		// usable session or leaves nothing behind at all. A duplicate email
+		// fails here on the unique constraint and unwinds everything.
 		session, err = s.openSession(ctx, repo, userID, &providerID, now, sc)
 		return err
 	})
 	if err != nil {
+		if isUniqueViolation(err) {
+			return Session{}, ErrEmailTaken
+		}
 		return Session{}, err
 	}
 
 	return session, nil
 }
+
+// isUniqueViolation reports whether Postgres refused a write because it would
+// duplicate a unique key. Checking the SQLSTATE rather than the message keeps
+// this working when the constraint is renamed.
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == uniqueViolation
+}
+
+// uniqueViolation is SQLSTATE 23505.
+const uniqueViolation = "23505"
