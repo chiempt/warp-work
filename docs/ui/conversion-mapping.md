@@ -57,6 +57,8 @@ one.
 | Autonomy level | `AutonomyBadge` + `Progress` | Evidence is the argument for a level, so it sits beside it. |
 | Navigation | `Sidebar` + `Command` (⌘K) | Long sittings; changing context should not need the mouse. |
 | Session scope | `live` marker on the sidebar's context list | The rule deciding what agents may touch, shown next to the contexts it governs — read from `SessionProvider`, so clocking out clears it. |
+| Context filter | Sidebar rows toggle `?contexts=` | Multi-select, held in the URL, carried across navigation. Selecting a parent covers its children. Empty means every context. |
+| Context creation | `Sheet` + `ContextForm` | Name, kind, nesting, active hours, tone profile. Slug follows the name and is validated against `contexts_slug_format`. |
 | Outbound / destructive | `AlertDialog` | Never `Dialog`. Approving sends real mail to a real client. |
 
 ## 3. Where Magic UI applies — and where it was cut

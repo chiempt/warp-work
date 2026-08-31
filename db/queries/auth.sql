@@ -74,3 +74,66 @@ RETURNING *;
 
 -- name: CreateAuthPassword :exec
 INSERT INTO auth_passwords (auth_provider_id, hash) VALUES ($1, $2);
+
+-- ProviderByKindSubject resolves a federated identity. Matching is on the
+-- provider's immutable subject, never the email.
+-- name: ProviderByKindSubject :one
+SELECT * FROM auth_providers WHERE kind = $1 AND subject = $2;
+
+-- name: ListAuthProviders :many
+SELECT * FROM auth_providers
+WHERE user_id = $1
+ORDER BY is_primary DESC, linked_at;
+
+-- name: CountAuthProviders :one
+SELECT count(*) FROM auth_providers WHERE user_id = $1;
+
+-- DeleteAuthProvider is scoped to the user so an id from elsewhere cannot be
+-- used to unlink someone else's. Removing the last one raises
+-- restrict_violation from a trigger; the service turns that into a conflict.
+-- name: DeleteAuthProvider :execrows
+DELETE FROM auth_providers WHERE id = $1 AND user_id = $2;
+
+-- ListLiveSessions is what makes a lost laptop revocable: it exists so the
+-- owner can see where they are signed in and end one of them.
+-- name: ListLiveSessions :many
+SELECT s.*, p.kind AS provider_kind
+FROM auth_sessions s
+LEFT JOIN auth_providers p ON p.id = s.auth_provider_id
+WHERE s.user_id = $1
+  AND s.revoked_at IS NULL
+  AND s.expires_at > @now::timestamptz
+ORDER BY s.last_seen_at DESC;
+
+-- RevokeSessionByID is idempotent for a session that belongs to the caller:
+-- COALESCE keeps the original revocation time, so the row still matches and the
+-- second call is a no-op rather than a miss. Zero rows therefore means "not
+-- yours", which is the only case worth a 404.
+-- name: RevokeSessionByID :execrows
+UPDATE auth_sessions
+SET revoked_at = COALESCE(revoked_at, @revoked_at)
+WHERE id = @session_id AND user_id = @user_id;
+
+-- name: RevokeSessionByTokenHash :execrows
+UPDATE auth_sessions
+SET revoked_at = @revoked_at
+WHERE token_hash = @token_hash AND revoked_at IS NULL;
+
+-- SweepExpiredSessions removes rows that can no longer authenticate anything.
+-- Revoked rows are kept for a grace period rather than deleted immediately, so
+-- "when did I sign out" stays answerable for a while.
+-- name: SweepExpiredSessions :execrows
+DELETE FROM auth_sessions
+WHERE expires_at < @cutoff::timestamptz
+   OR (revoked_at IS NOT NULL AND revoked_at < @cutoff::timestamptz);
+
+-- UpdatePasswordHash re-hashes at the current cost. A successful sign-in is the
+-- only moment the plaintext is available to do it with.
+-- name: UpdatePasswordHash :exec
+UPDATE auth_passwords SET hash = $2 WHERE auth_provider_id = $1;
+
+-- UserProfileByEmail supports linking a federated identity to an account that
+-- already exists. Only ever called with an email the provider marked verified —
+-- matching on an unverified one is an account-takeover route.
+-- name: UserProfileByEmail :one
+SELECT * FROM user_profiles WHERE email = $1;

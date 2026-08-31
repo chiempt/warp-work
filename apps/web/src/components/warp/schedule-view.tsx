@@ -28,6 +28,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "@/lib/format"
+import { useContextFilter } from "@/lib/context-filter"
 import { scheduleEntries } from "@/lib/schedule"
 import type { ScheduleEntry } from "@/lib/schedule"
 import { events as seedEvents, incomingGoogleEvents, NOW } from "@/lib/mock/data"
@@ -67,6 +68,7 @@ export function ScheduleView({
   const [anchor, setAnchor] = React.useState(() => ownerDayKey(NOW))
 
   const router = useRouter()
+  const contextFilter = useContextFilter()
   const [eventList, setEventList] = React.useState<WorkEvent[]>(seedEvents)
   const [lastSync, setLastSync] = React.useState<SyncResult | null>(null)
   const [queued, setQueued] = React.useState<string | null>(null)
@@ -129,22 +131,27 @@ export function ScheduleView({
   const monthStart = startOfMonth(anchor)
 
   const visible = React.useMemo(() => {
+    const inContext = (entries: typeof all) =>
+      entries.filter((entry) => contextFilter.matches(entry.contextId))
+
     if (mode === "agenda") {
       const horizon = new Date(
         new Date(NOW).getTime() + AGENDA_HORIZON_DAYS * 24 * 60 * 60 * 1000,
       ).toISOString()
-      return all.filter((entry) => entry.startAt <= horizon)
+      return inContext(all.filter((entry) => entry.startAt <= horizon))
     }
     if (range === "week") {
       const from = weekStart
       const to = addDays(weekStart, 7)
-      return all.filter((entry) => {
-        const key = ownerDayKey(entry.startAt)
-        return key >= from && key < to
-      })
+      return inContext(
+        all.filter((entry) => {
+          const key = ownerDayKey(entry.startAt)
+          return key >= from && key < to
+        }),
+      )
     }
-    return all
-  }, [all, mode, range, weekStart])
+    return inContext(all)
+  }, [all, mode, range, weekStart, contextFilter])
 
   const step = (direction: 1 | -1) =>
     setAnchor((current) =>

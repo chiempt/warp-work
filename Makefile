@@ -89,6 +89,14 @@ openapi-check: openapi
 		exit 1; \
 	fi
 
+## plan: rebuild the spreadsheet view from docs/planning/backlog.csv
+#
+# The CSV is the source of truth — it is what a pull request touches and what
+# git can merge. The .xlsx is a generated view; editing it is discarded here.
+.PHONY: plan
+plan:
+	@python3 infra/scripts/build-plan.py
+
 ## docs: open the browsable API contract (the api must be running)
 .PHONY: docs
 docs:
@@ -153,6 +161,16 @@ build:
 # and the one before it dies at a moment nobody connected to anything. `exec`
 # replaces make's shell with the service itself, so there is one process, and
 # Ctrl-C reaches the signal handler that drains it.
+
+## dev: run the API and the web app together — Ctrl-C stops both
+.PHONY: dev
+dev: require-db
+	@bash infra/scripts/dev.sh
+
+## dev-all: dev, plus the background worker
+.PHONY: dev-all
+dev-all: require-db
+	@WITH_WORKER=1 bash infra/scripts/dev.sh
 
 ## run-api: run the HTTP service
 .PHONY: run-api

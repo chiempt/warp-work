@@ -68,21 +68,42 @@ type Service struct {
 	clock  func() time.Time
 	policy Policy
 	params PasswordParams
+	google *GoogleProvider
+}
+
+// Option configures a Service. Federated sign-in is optional: the service is
+// fully usable with passwords alone, and says so rather than failing when a
+// provider has no credentials.
+type Option func(*Service)
+
+// WithGoogle enables Google sign-in. Passing an unconfigured GoogleConfig is
+// allowed and leaves the feature reporting itself as unavailable.
+func WithGoogle(cfg GoogleConfig) Option {
+	return func(s *Service) { s.google = NewGoogleProvider(cfg) }
+}
+
+// GoogleEnabled reports whether Google sign-in can be attempted.
+func (s *Service) GoogleEnabled() bool {
+	return s.google != nil && s.google.Configured()
 }
 
 // NewService wires the service. clock may be nil, in which case time.Now is
 // used — tests pass their own so session expiry can be exercised without
 // waiting.
-func NewService(st Store, clock func() time.Time) *Service {
+func NewService(st Store, clock func() time.Time, opts ...Option) *Service {
 	if clock == nil {
 		clock = time.Now
 	}
-	return &Service{
+	svc := &Service{
 		store:  st,
 		clock:  clock,
 		policy: DefaultPolicy(),
 		params: DefaultPasswordParams(),
 	}
+	for _, opt := range opts {
+		opt(svc)
+	}
+	return svc
 }
 
 // Session is what a successful sign-in produces: the record, plus the one and
@@ -139,6 +160,18 @@ func (s *Service) SignInWithPassword(ctx context.Context, email, password string
 
 	if err := s.store.ClearFailedLogins(ctx, cred.ProviderID); err != nil {
 		return Session{}, fmt.Errorf("clear failed logins: %w", err)
+	}
+
+	// A successful sign-in is the only moment the plaintext exists to re-hash
+	// with. Best effort: a failure here must not stop someone signing in with
+	// the correct password, and the next attempt will try again.
+	if NeedsRehash(cred.Hash, s.params) {
+		if upgraded, hashErr := HashPassword(password, s.params); hashErr == nil {
+			_ = s.store.UpdatePasswordHash(ctx, store.UpdatePasswordHashParams{
+				AuthProviderID: cred.ProviderID,
+				Hash:           upgraded,
+			})
+		}
 	}
 	if err := s.store.MarkProviderUsed(ctx, store.MarkProviderUsedParams{
 		ID:          cred.ProviderID,

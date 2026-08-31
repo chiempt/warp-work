@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/chiempham/warp-work/internal/store"
 )
@@ -31,6 +32,20 @@ type Repository interface {
 	CreateUserProfile(ctx context.Context, arg store.CreateUserProfileParams) (store.UserProfile, error)
 	CreateAuthProvider(ctx context.Context, arg store.CreateAuthProviderParams) (store.AuthProvider, error)
 	CreateAuthPassword(ctx context.Context, arg store.CreateAuthPasswordParams) error
+
+	// Federated identities.
+	ProviderByKindSubject(ctx context.Context, arg store.ProviderByKindSubjectParams) (store.AuthProvider, error)
+
+	// Session and sign-in-method management.
+	ListLiveSessions(ctx context.Context, arg store.ListLiveSessionsParams) ([]store.ListLiveSessionsRow, error)
+	RevokeSessionByID(ctx context.Context, arg store.RevokeSessionByIDParams) (int64, error)
+	RevokeSessionByTokenHash(ctx context.Context, arg store.RevokeSessionByTokenHashParams) (int64, error)
+	SweepExpiredSessions(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error)
+	ListAuthProviders(ctx context.Context, userID uuid.UUID) ([]store.AuthProvider, error)
+	CountAuthProviders(ctx context.Context, userID uuid.UUID) (int64, error)
+	DeleteAuthProvider(ctx context.Context, arg store.DeleteAuthProviderParams) (int64, error)
+	UpdatePasswordHash(ctx context.Context, arg store.UpdatePasswordHashParams) error
+	UserProfileByEmail(ctx context.Context, email string) (store.UserProfile, error)
 }
 
 var _ Repository = (*store.Queries)(nil)

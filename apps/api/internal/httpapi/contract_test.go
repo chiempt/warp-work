@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -95,16 +96,52 @@ func TestSecurityIsCheckedBeforeValidation(t *testing.T) {
 	}
 }
 
-// Signing in cannot require a session. These two opt out with `security: []`,
-// and reaching the handler at all is what proves the opt-out took effect.
+// Signing in cannot require a session. These opt out with `security: []`, and
+// reaching the handler at all is what proves the opt-out took effect.
+//
+// With no Google credentials configured the handler answers 501 naming the
+// variables to set - which is the difference between "not built" and "not
+// configured here".
 func TestSignInEndpointsAreReachableWithoutASession(t *testing.T) {
 	status, body := get(t, "/api/v1/auth/google/start")
 
 	if status != http.StatusNotImplemented {
-		t.Fatalf("want 501 — reached the handler, not yet written — got %d", status)
+		t.Fatalf("want 501, got %d", status)
 	}
-	if body.Error.Code != "not_implemented" {
-		t.Errorf("want code not_implemented, got %q", body.Error.Code)
+	if body.Error.Code != "provider_not_configured" {
+		t.Errorf("want code provider_not_configured, got %q", body.Error.Code)
+	}
+	if !strings.Contains(body.Error.Message, "GOOGLE_CLIENT_ID") {
+		t.Error("the message must name the variables that turn it on")
+	}
+}
+
+// A callback that did not start here carries no flow cookie. One message for
+// every way that can happen - a missing cookie, an unreadable one, a state that
+// does not match - because the distinction only hints at how the check works.
+func TestGoogleCallbackWithoutAnAttempt_is401(t *testing.T) {
+	status, body := get(t, "/api/v1/auth/google/callback?code=abc&state=def")
+
+	if status != http.StatusUnauthorized {
+		t.Fatalf("want 401, got %d", status)
+	}
+	if body.Error.Code != "sign_in_expired" {
+		t.Errorf("want code sign_in_expired, got %q", body.Error.Code)
+	}
+}
+
+// Declining at the consent screen is a decision, not an error. Returning JSON
+// into a browser window would be the wrong shape of answer.
+func TestGoogleCallbackDeclined_redirectsBack(t *testing.T) {
+	rec := httptest.NewRecorder()
+	newServer(t).ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		"/api/v1/auth/google/callback?code=&state=x&error=access_denied", nil))
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("want 302, got %d", rec.Code)
+	}
+	if loc := rec.Header().Get("Location"); !strings.Contains(loc, "auth_error=declined") {
+		t.Errorf("the app needs to be told why it was returned; Location = %q", loc)
 	}
 }
 

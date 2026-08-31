@@ -7,7 +7,6 @@ import {
   FileTextIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
-  LogOutIcon,
   ScrollTextIcon,
   SettingsIcon,
 } from "lucide-react"
@@ -30,10 +29,12 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { CommandMenu } from "@/components/warp/command-menu"
 import { ContextChip } from "@/components/warp/context-chip"
+import { useContexts } from "@/components/warp/contexts-provider"
 import { useSession } from "@/components/warp/session-provider"
+import { CONTEXT_PARAM, useContextFilter } from "@/lib/context-filter"
 import { SignOutButton } from "@/components/warp/sign-out-button"
 import { cn } from "@/lib/utils"
-import { commitments, contexts, proposedActions, tasks } from "@/lib/mock/data"
+import { commitments, proposedActions, tasks } from "@/lib/mock/data"
 
 /**
  * Every badge in this file states what it counts.
@@ -68,6 +69,16 @@ const nav = [
 export function AppSidebar({ email }: { email?: string }) {
   const pathname = usePathname()
   const { session, scope } = useSession()
+  const { contexts } = useContexts()
+  const filter = useContextFilter()
+
+  // The context selection is the view, not a property of one screen. Carrying it
+  // across navigation is the difference between a filter and a per-page setting —
+  // without this, moving from Work items to Schedule silently shows everything again.
+  const withFilter = (href: string) =>
+    filter.selected.length === 0
+      ? href
+      : `${href}?${CONTEXT_PARAM}=${encodeURIComponent(filter.selected.join(","))}`
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href)
@@ -104,7 +115,7 @@ export function AppSidebar({ email }: { email?: string }) {
                       isActive={isActive(item.href)}
                       tooltip={item.label}
                       render={
-                        <Link href={item.href}>
+                        <Link href={withFilter(item.href)}>
                           <item.icon />
                           <span>{item.label}</span>
                         </Link>
@@ -136,9 +147,19 @@ export function AppSidebar({ email }: { email?: string }) {
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
           <SidebarGroupLabel>
             Contexts
-            <span className="ml-auto font-normal text-muted-foreground/70">
-              {session ? `${scope.length} in session` : "no session"}
-            </span>
+            {filter.selected.length > 0 ? (
+              <button
+                type="button"
+                onClick={filter.clear}
+                className="ml-auto font-normal text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                showing {filter.selected.length} · clear
+              </button>
+            ) : (
+              <span className="ml-auto font-normal text-muted-foreground/70">
+                {session ? `${scope.length} in session` : "no session"}
+              </span>
+            )}
           </SidebarGroupLabel>
 
           <SidebarGroupContent>
@@ -150,30 +171,33 @@ export function AppSidebar({ email }: { email?: string }) {
                   (c) => c.contextId === context.id && c.status === "open",
                 ).length
 
+                const picked = filter.isSelected(context.slug)
+
                 return (
                   <SidebarMenuItem key={context.id}>
+                    {/* A filter, not a link. These used to navigate to
+                        /work-items?context=<slug>, which meant narrowing the view
+                        from any other screen threw you off it, and only ever to one
+                        context at a time. Toggling stays where you are, and several
+                        can be on at once. */}
                     <SidebarMenuButton
+                      isActive={picked}
+                      aria-pressed={picked}
+                      onClick={() => filter.toggle(context.slug)}
                       className={cn(
                         "h-7",
                         // A child sits inside its parent's rail rather than on a
                         // slightly different indent nobody can measure by eye.
                         nested && "ml-3 border-l border-sidebar-border pl-2.5",
-                        !inScope && session && "opacity-55",
+                        !inScope && session && !picked && "opacity-55",
                       )}
-                      render={
-                        <Link
-                          href={{
-                            pathname: "/work-items",
-                            query: { context: context.slug },
-                          }}
-                        >
-                          <ContextChip
-                            contextId={context.id}
-                            className="text-[13px]"
-                          />
-                        </Link>
-                      }
-                    />
+                    >
+                      <ContextChip
+                        contextId={context.id}
+                        preview={{ name: context.name, kind: context.kind }}
+                        className="text-[13px]"
+                      />
+                    </SidebarMenuButton>
 
                     {/* Not a count. Whether agents may touch this context right now
                         is the rule the whole session model turns on, and this list

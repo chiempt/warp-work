@@ -8,11 +8,13 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
 	AssignSignalContext(ctx context.Context, arg AssignSignalContextParams) error
 	ClearFailedLogins(ctx context.Context, authProviderID uuid.UUID) error
+	CountAuthProviders(ctx context.Context, userID uuid.UUID) (int64, error)
 	CreateAuthPassword(ctx context.Context, arg CreateAuthPasswordParams) error
 	CreateAuthProvider(ctx context.Context, arg CreateAuthProviderParams) (AuthProvider, error)
 	CreateAuthSession(ctx context.Context, arg CreateAuthSessionParams) (AuthSession, error)
@@ -24,6 +26,10 @@ type Querier interface {
 	// Timezone is deliberately absent: the column default is the single place that
 	// value is written down.
 	CreateUserProfile(ctx context.Context, arg CreateUserProfileParams) (UserProfile, error)
+	// DeleteAuthProvider is scoped to the user so an id from elsewhere cannot be
+	// used to unlink someone else's. Removing the last one raises
+	// restrict_violation from a trigger; the service turns that into a conflict.
+	DeleteAuthProvider(ctx context.Context, arg DeleteAuthProviderParams) (int64, error)
 	GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 	GetContext(ctx context.Context, id uuid.UUID) (Context, error)
 	// GetPasswordCredential is the whole of what a password sign-in needs, in one
@@ -42,10 +48,14 @@ type Querier interface {
 	ListAccountsDueForSync(ctx context.Context, arg ListAccountsDueForSyncParams) ([]Account, error)
 	ListAccountsForContexts(ctx context.Context, contextIds []uuid.UUID) ([]Account, error)
 	ListActiveRoutingRules(ctx context.Context, userID uuid.UUID) ([]RoutingRule, error)
+	ListAuthProviders(ctx context.Context, userID uuid.UUID) ([]AuthProvider, error)
 	// ListContextTimeline is the read path behind the timeline view. It is
 	// context-scoped by construction: there is no unfiltered signal listing.
 	ListContextTimeline(ctx context.Context, arg ListContextTimelineParams) ([]ListContextTimelineRow, error)
 	ListContexts(ctx context.Context, arg ListContextsParams) ([]Context, error)
+	// ListLiveSessions is what makes a lost laptop revocable: it exists so the
+	// owner can see where they are signed in and end one of them.
+	ListLiveSessions(ctx context.Context, arg ListLiveSessionsParams) ([]ListLiveSessionsRow, error)
 	// ListLowConfidenceAssignments backs the manual routing queue. The threshold is
 	// open question 1 — the caller supplies it rather than the query assuming one.
 	ListLowConfidenceAssignments(ctx context.Context, threshold float64) ([]SignalContext, error)
@@ -75,11 +85,31 @@ type Querier interface {
 	MarkProviderUsed(ctx context.Context, arg MarkProviderUsedParams) error
 	// MarkSignalProcessed sets the only column on a signal that may ever change.
 	MarkSignalProcessed(ctx context.Context, arg MarkSignalProcessedParams) error
+	// ProviderByKindSubject resolves a federated identity. Matching is on the
+	// provider's immutable subject, never the email.
+	ProviderByKindSubject(ctx context.Context, arg ProviderByKindSubjectParams) (AuthProvider, error)
 	// RecordFailedLogin counts the attempt and locks the credential once the count
 	// reaches the threshold. Counted in the database rather than in Redis: a
 	// lockout that evaporates when the cache restarts is not a lockout.
 	RecordFailedLogin(ctx context.Context, arg RecordFailedLoginParams) (RecordFailedLoginRow, error)
+	// RevokeSessionByID is idempotent for a session that belongs to the caller:
+	// COALESCE keeps the original revocation time, so the row still matches and the
+	// second call is a no-op rather than a miss. Zero rows therefore means "not
+	// yours", which is the only case worth a 404.
+	RevokeSessionByID(ctx context.Context, arg RevokeSessionByIDParams) (int64, error)
+	RevokeSessionByTokenHash(ctx context.Context, arg RevokeSessionByTokenHashParams) (int64, error)
+	// SweepExpiredSessions removes rows that can no longer authenticate anything.
+	// Revoked rows are kept for a grace period rather than deleted immediately, so
+	// "when did I sign out" stays answerable for a while.
+	SweepExpiredSessions(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error)
 	TouchAuthSession(ctx context.Context, arg TouchAuthSessionParams) error
+	// UpdatePasswordHash re-hashes at the current cost. A successful sign-in is the
+	// only moment the plaintext is available to do it with.
+	UpdatePasswordHash(ctx context.Context, arg UpdatePasswordHashParams) error
+	// UserProfileByEmail supports linking a federated identity to an account that
+	// already exists. Only ever called with an email the provider marked verified —
+	// matching on an unverified one is an account-takeover route.
+	UserProfileByEmail(ctx context.Context, email string) (UserProfile, error)
 }
 
 var _ Querier = (*Queries)(nil)

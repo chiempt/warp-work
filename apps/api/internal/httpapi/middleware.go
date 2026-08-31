@@ -61,6 +61,7 @@ func defaultMiddleware(logger *slog.Logger) []echo.MiddlewareFunc {
 		requestLogger(logger),
 		echomw.Recover(),
 		withClientInfo,
+		withOAuthFlow,
 		echomw.BodyLimit("2M"),
 	}
 }

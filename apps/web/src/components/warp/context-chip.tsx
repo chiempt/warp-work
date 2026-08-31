@@ -52,11 +52,34 @@ export function ContextChip({
   contextId,
   className,
   showParent = false,
+  preview,
 }: {
   contextId: string | null
   className?: string
   showParent?: boolean
+  /**
+   * The context itself, when the caller already has it.
+   *
+   * Lookup by id goes through the fixtures, which a context created during this
+   * session is not in — it would render as "Unrouted", which is what the record
+   * means, not what it is. Callers holding the live list pass the object instead.
+   */
+  preview?: { name: string; kind: ContextKind }
 }) {
+  if (preview) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground",
+          className,
+        )}
+      >
+        <span className={cn("size-1.5 shrink-0 rounded-full", kindDot[preview.kind])} />
+        {preview.name}
+      </span>
+    )
+  }
+
   const context = contextId ? contextById.get(contextId) : undefined
 
   if (!context) {

@@ -1,0 +1,19 @@
+# Normalise line endings so a contributor on Windows does not rewrite every file.
+* text=auto eol=lf
+
+# --- generated: reviewable as a result, not as a diff -----------------------
+# Marked so GitHub collapses them in pull requests. They are committed because
+# the build needs them, but they are never edited by hand — see CONTRIBUTING.md.
+internal/store/**            linguist-generated=true
+apps/api/internal/api/**     linguist-generated=true
+apps/web/src/lib/api/schema.d.ts linguist-generated=true
+
+# --- binary ----------------------------------------------------------------
+# A spreadsheet cannot be diffed or merged, so git must not try. This one is a
+# view of docs/planning/backlog.csv; regenerate with `make plan` rather than
+# resolving a conflict in it.
+*.xlsx binary linguist-generated=true
+
+# --- lockfiles: keep them out of review noise ------------------------------
+pnpm-lock.yaml  -diff linguist-generated=true
+go.sum          -diff

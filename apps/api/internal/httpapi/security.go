@@ -5,8 +5,6 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/google/uuid"
-
 	"github.com/chiempham/warp-work/apps/api/internal/api"
 	"github.com/chiempham/warp-work/internal/auth"
 )
@@ -26,17 +24,16 @@ type securityHandler struct {
 
 var _ api.SecurityHandler = (*securityHandler)(nil)
 
-// signedInUser is the user id the session resolved to, put on the context for
-// handlers. Handlers never take a user id from a parameter — there is one
-// owner, and which one it is comes from the session, not the caller.
-type signedInUserKey struct{}
+// principalKey carries who the request belongs to. Handlers never take a user
+// id from a parameter — which account is asking comes from the session, not
+// from the caller.
+//
+// The session id travels with it because "sign out" and "which of these is me"
+// both need to know which session is asking.
+type principalKey struct{}
 
 func (s *securityHandler) HandleSessionCookie(ctx context.Context, _ api.OperationName, t api.SessionCookie) (context.Context, error) {
-	if s.auth == nil {
-		return ctx, ErrNoSession
-	}
-
-	session, err := s.auth.Authenticate(ctx, t.APIKey)
+	principal, err := s.auth.AuthenticatePrincipal(ctx, t.APIKey)
 	if err != nil {
 		if errors.Is(err, auth.ErrNoSession) {
 			return ctx, ErrNoSession
@@ -47,11 +44,22 @@ func (s *securityHandler) HandleSessionCookie(ctx context.Context, _ api.Operati
 		return ctx, err
 	}
 
-	return context.WithValue(ctx, signedInUserKey{}, session.UserID), nil
+	// The raw token is kept alongside so sign-out can revoke exactly the
+	// session the request arrived on, without a second lookup.
+	ctx = context.WithValue(ctx, principalKey{}, principal)
+	return context.WithValue(ctx, sessionTokenKey{}, t.APIKey), nil
 }
 
-// signedInUser reports which owner the current request belongs to.
-func signedInUser(ctx context.Context) (uuid.UUID, bool) {
-	id, ok := ctx.Value(signedInUserKey{}).(uuid.UUID)
-	return id, ok
+type sessionTokenKey struct{}
+
+// principalFrom reports which account and session the current request belongs
+// to. Absent only on the endpoints that opt out of the security requirement.
+func principalFrom(ctx context.Context) (auth.Principal, bool) {
+	p, ok := ctx.Value(principalKey{}).(auth.Principal)
+	return p, ok
+}
+
+func sessionTokenFrom(ctx context.Context) string {
+	token, _ := ctx.Value(sessionTokenKey{}).(string)
+	return token
 }

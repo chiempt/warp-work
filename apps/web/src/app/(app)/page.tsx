@@ -19,6 +19,7 @@ import { ReviewQueue } from "@/components/warp/review-queue"
 import { SignalFeed } from "@/components/warp/signal-feed"
 import { StatCard } from "@/components/warp/stat-card"
 import { EmptyState } from "@/components/warp/states"
+import { contextMatcher, parseContextParam } from "@/lib/context-scope"
 import { formatRelative, formatTime, isOverdue, ownerDayKey } from "@/lib/format"
 import {
   commitments,
@@ -30,15 +31,26 @@ import {
   tasks,
 } from "@/lib/mock/data"
 
-export default function DashboardPage() {
-  const pending = proposedActions.filter((a) => a.status === "pending")
-  const openCommitments = commitments.filter((c) => c.status === "open")
+export default async function DashboardPage(props: PageProps<"/">) {
+  // The sidebar's context selection, applied here too. Read from the URL rather than
+  // from a client hook so the server renders the filtered page directly — the summary
+  // never briefly shows contexts the owner has filtered out.
+  const params = await props.searchParams
+  const inContext = contextMatcher(parseContextParam(params.contexts))
+
+  const pending = proposedActions.filter(
+    (a) => a.status === "pending" && inContext(a.contextId),
+  )
+  const openCommitments = commitments
+    .filter((c) => c.status === "open")
+    .filter((c) => inContext(c.contextId))
   const iOwe = openCommitments.filter((c) => c.direction === "i_owe")
   const overdue = openCommitments.filter((c) => isOverdue(c.dueAt, NOW))
   const today = ownerDayKey(NOW)
 
   const dueToday = tasks.filter(
     (t) =>
+      inContext(t.contextId) &&
       t.status !== "done" &&
       t.status !== "dropped" &&
       t.dueAt !== null &&
@@ -46,7 +58,12 @@ export default function DashboardPage() {
   )
 
   const todaysEvents = events
-    .filter((e) => ownerDayKey(e.startAt) === today && e.status !== "cancelled")
+    .filter(
+      (e) =>
+        inContext(e.contextId) &&
+        ownerDayKey(e.startAt) === today &&
+        e.status !== "cancelled",
+    )
     .sort((a, b) => a.startAt.localeCompare(b.startAt))
 
   const atRisk = [...openCommitments]
@@ -108,7 +125,7 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-            <ReviewQueue />
+            <ReviewQueue actions={pending} />
           </section>
 
           <Card>
@@ -208,7 +225,11 @@ export default function DashboardPage() {
                   description="Connect an account, or forward mail to the manual address, and the timeline fills itself."
                 />
               ) : (
-                <SignalFeed signals={signals.slice(0, 5)} />
+                <SignalFeed
+                  signals={signals
+                    .filter((s) => s.contextId === null || inContext(s.contextId))
+                    .slice(0, 5)}
+                />
               )}
             </CardContent>
           </Card>

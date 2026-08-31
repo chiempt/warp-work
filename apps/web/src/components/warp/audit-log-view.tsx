@@ -21,6 +21,7 @@ import {
 import { ContextChip } from "@/components/warp/context-chip"
 import { EmptyState } from "@/components/warp/states"
 import { cn } from "@/lib/utils"
+import { useContextFilter } from "@/lib/context-filter"
 import { formatRelative, formatStamp } from "@/lib/format"
 import { auditEntries, NOW } from "@/lib/mock/data"
 import type { AuditActor } from "@/lib/mock/types"
@@ -39,6 +40,7 @@ const actorIcon: Record<AuditActor, typeof UserIcon> = {
  * prose. Sorted newest first and never paginated away from the moment being examined.
  */
 export function AuditLogView() {
+  const contextFilter = useContextFilter()
   const [actor, setActor] = React.useState(ANY_ACTOR)
   const [query, setQuery] = React.useState("")
   const [expanded, setExpanded] = React.useState<string | null>(null)
@@ -47,6 +49,10 @@ export function AuditLogView() {
     .filter(
       (e) =>
         (actor === ANY_ACTOR || e.actor === actor) &&
+        // An entry with no context — a session opening, a routing decision that
+        // reached no context — belongs to every view. Hiding it behind a filter it
+        // cannot satisfy would make the log look like it skipped events.
+        (e.contextId === null || contextFilter.matches(e.contextId)) &&
         `${e.summary} ${e.entityType} ${e.action} ${e.entityId}`
           .toLowerCase()
           .includes(query.toLowerCase()),

@@ -57,10 +57,10 @@ import {
 import { EmptyState } from "@/components/warp/states"
 import { TaskForm } from "@/components/warp/task-form"
 import { cn } from "@/lib/utils"
+import { useContextFilter } from "@/lib/context-filter"
 import { formatDay, formatRelative, isOverdue } from "@/lib/format"
 import {
   commitments as seedCommitments,
-  contexts,
   contextById,
   NOW,
   personById,
@@ -69,7 +69,6 @@ import {
 } from "@/lib/mock/data"
 import type { Commitment, Task, TaskStatus } from "@/lib/mock/types"
 
-const ANY = "All contexts"
 const OPEN_ONLY = "Open only"
 
 /**
@@ -86,20 +85,13 @@ const OPEN_ONLY = "Open only"
  * UI-only: edits live in local state. When the API lands these become the task and
  * commitment resources.
  */
-export function WorkItemsView({
-  initialTab = "tasks",
-  initialContextSlug,
-}: {
-  initialTab?: string
-  initialContextSlug?: string
-}) {
-  const initialContext =
-    contexts.find((c) => c.slug === initialContextSlug)?.name ?? ANY
-
+export function WorkItemsView({ initialTab = "tasks" }: { initialTab?: string }) {
   const [tab, setTab] = React.useState(
     initialTab === "commitments" ? "commitments" : "tasks",
   )
-  const [contextName, setContextName] = React.useState(initialContext)
+  // Context comes from the sidebar, which is on every screen and can hold several at
+  // once. A second context picker here would be a second answer to the same question.
+  const contextFilter = useContextFilter()
   const [statusFilter, setStatusFilter] = React.useState(OPEN_ONLY)
   const [query, setQuery] = React.useState("")
 
@@ -140,14 +132,8 @@ export function WorkItemsView({
         : current.map((item) => (item.id === commitment.id ? commitment : item)),
     )
 
-  const contextId =
-    contextName === ANY
-      ? null
-      : (contexts.find((c) => c.name === contextName)?.id ?? null)
-
   const matches = (id: string, text: string) =>
-    (contextId === null || id === contextId) &&
-    text.toLowerCase().includes(query.toLowerCase())
+    contextFilter.matches(id) && text.toLowerCase().includes(query.toLowerCase())
 
   const tasks = taskList.filter(
     (t) =>
@@ -182,23 +168,6 @@ export function WorkItemsView({
                 className="h-8 w-44 pl-7"
               />
             </div>
-
-            <Select
-              value={contextName}
-              onValueChange={(value) => setContextName(value ?? ANY)}
-            >
-              <SelectTrigger size="sm" className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ANY}>{ANY}</SelectItem>
-                {contexts.map((c) => (
-                  <SelectItem key={c.id} value={c.name}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
 
             <Select
               value={statusFilter}

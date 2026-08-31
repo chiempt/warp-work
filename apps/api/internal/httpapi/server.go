@@ -40,11 +40,16 @@ func New(cfg config.Config, logger *slog.Logger, pool *postgres.Pool) (*Server, 
 	e.HidePort = true
 	e.HTTPErrorHandler = errorHandler(logger)
 
-	// The pool may be nil in tests that never reach the database.
-	var authSvc *auth.Service
-	if pool != nil {
-		authSvc = auth.NewService(auth.NewPgxStore(pool), nil)
-	}
+	// Always constructed, never nil. A conditionally-nil service is a landmine:
+	// every handler would have to guard against it, and the one that forgot
+	// would panic instead of answering. With a nil pool the service still
+	// reports Google sign-in correctly, because that path touches no database.
+	authSvc := auth.NewService(auth.NewPgxStore(pool), nil,
+		auth.WithGoogle(auth.GoogleConfig{
+			ClientID:     cfg.Google.ClientID,
+			ClientSecret: cfg.Google.ClientSecret,
+			RedirectURL:  cfg.Google.RedirectURL,
+		}))
 
 	s := &Server{echo: e, cfg: cfg, logger: logger, pool: pool, auth: authSvc}
 

@@ -24,6 +24,17 @@ func (q *Queries) ClearFailedLogins(ctx context.Context, authProviderID uuid.UUI
 	return err
 }
 
+const countAuthProviders = `-- name: CountAuthProviders :one
+SELECT count(*) FROM auth_providers WHERE user_id = $1
+`
+
+func (q *Queries) CountAuthProviders(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countAuthProviders, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAuthPassword = `-- name: CreateAuthPassword :exec
 INSERT INTO auth_passwords (auth_provider_id, hash) VALUES ($1, $2)
 `
@@ -157,6 +168,26 @@ func (q *Queries) CreateUserProfile(ctx context.Context, arg CreateUserProfilePa
 	return i, err
 }
 
+const deleteAuthProvider = `-- name: DeleteAuthProvider :execrows
+DELETE FROM auth_providers WHERE id = $1 AND user_id = $2
+`
+
+type DeleteAuthProviderParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+// DeleteAuthProvider is scoped to the user so an id from elsewhere cannot be
+// used to unlink someone else's. Removing the last one raises
+// restrict_violation from a trigger; the service turns that into a conflict.
+func (q *Queries) DeleteAuthProvider(ctx context.Context, arg DeleteAuthProviderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAuthProvider, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getPasswordCredential = `-- name: GetPasswordCredential :one
 SELECT p.id   AS provider_id,
        p.user_id,
@@ -213,6 +244,104 @@ func (q *Queries) GetUserProfile(ctx context.Context, userID uuid.UUID) (UserPro
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listAuthProviders = `-- name: ListAuthProviders :many
+SELECT id, user_id, kind, subject, email, is_primary, linked_at, last_login_at FROM auth_providers
+WHERE user_id = $1
+ORDER BY is_primary DESC, linked_at
+`
+
+func (q *Queries) ListAuthProviders(ctx context.Context, userID uuid.UUID) ([]AuthProvider, error) {
+	rows, err := q.db.Query(ctx, listAuthProviders, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AuthProvider{}
+	for rows.Next() {
+		var i AuthProvider
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Kind,
+			&i.Subject,
+			&i.Email,
+			&i.IsPrimary,
+			&i.LinkedAt,
+			&i.LastLoginAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLiveSessions = `-- name: ListLiveSessions :many
+SELECT s.id, s.user_id, s.auth_provider_id, s.token_hash, s.issued_at, s.last_seen_at, s.expires_at, s.revoked_at, s.user_agent, s.ip, p.kind AS provider_kind
+FROM auth_sessions s
+LEFT JOIN auth_providers p ON p.id = s.auth_provider_id
+WHERE s.user_id = $1
+  AND s.revoked_at IS NULL
+  AND s.expires_at > $2::timestamptz
+ORDER BY s.last_seen_at DESC
+`
+
+type ListLiveSessionsParams struct {
+	UserID uuid.UUID
+	Now    pgtype.Timestamptz
+}
+
+type ListLiveSessionsRow struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	AuthProviderID *uuid.UUID
+	TokenHash      []byte
+	IssuedAt       pgtype.Timestamptz
+	LastSeenAt     pgtype.Timestamptz
+	ExpiresAt      pgtype.Timestamptz
+	RevokedAt      pgtype.Timestamptz
+	UserAgent      string
+	Ip             *netip.Addr
+	ProviderKind   *AuthProviderKind
+}
+
+// ListLiveSessions is what makes a lost laptop revocable: it exists so the
+// owner can see where they are signed in and end one of them.
+func (q *Queries) ListLiveSessions(ctx context.Context, arg ListLiveSessionsParams) ([]ListLiveSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listLiveSessions, arg.UserID, arg.Now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveSessionsRow{}
+	for rows.Next() {
+		var i ListLiveSessionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.AuthProviderID,
+			&i.TokenHash,
+			&i.IssuedAt,
+			&i.LastSeenAt,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+			&i.UserAgent,
+			&i.Ip,
+			&i.ProviderKind,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const liveSessionByTokenHash = `-- name: LiveSessionByTokenHash :one
@@ -279,6 +408,33 @@ func (q *Queries) MarkProviderUsed(ctx context.Context, arg MarkProviderUsedPara
 	return err
 }
 
+const providerByKindSubject = `-- name: ProviderByKindSubject :one
+SELECT id, user_id, kind, subject, email, is_primary, linked_at, last_login_at FROM auth_providers WHERE kind = $1 AND subject = $2
+`
+
+type ProviderByKindSubjectParams struct {
+	Kind    AuthProviderKind
+	Subject string
+}
+
+// ProviderByKindSubject resolves a federated identity. Matching is on the
+// provider's immutable subject, never the email.
+func (q *Queries) ProviderByKindSubject(ctx context.Context, arg ProviderByKindSubjectParams) (AuthProvider, error) {
+	row := q.db.QueryRow(ctx, providerByKindSubject, arg.Kind, arg.Subject)
+	var i AuthProvider
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Kind,
+		&i.Subject,
+		&i.Email,
+		&i.IsPrimary,
+		&i.LinkedAt,
+		&i.LastLoginAt,
+	)
+	return i, err
+}
+
 const recordFailedLogin = `-- name: RecordFailedLogin :one
 UPDATE auth_passwords
 SET failed_attempts = failed_attempts + 1,
@@ -311,6 +467,66 @@ func (q *Queries) RecordFailedLogin(ctx context.Context, arg RecordFailedLoginPa
 	return i, err
 }
 
+const revokeSessionByID = `-- name: RevokeSessionByID :execrows
+UPDATE auth_sessions
+SET revoked_at = COALESCE(revoked_at, $1)
+WHERE id = $2 AND user_id = $3
+`
+
+type RevokeSessionByIDParams struct {
+	RevokedAt pgtype.Timestamptz
+	SessionID uuid.UUID
+	UserID    uuid.UUID
+}
+
+// RevokeSessionByID is idempotent for a session that belongs to the caller:
+// COALESCE keeps the original revocation time, so the row still matches and the
+// second call is a no-op rather than a miss. Zero rows therefore means "not
+// yours", which is the only case worth a 404.
+func (q *Queries) RevokeSessionByID(ctx context.Context, arg RevokeSessionByIDParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeSessionByID, arg.RevokedAt, arg.SessionID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeSessionByTokenHash = `-- name: RevokeSessionByTokenHash :execrows
+UPDATE auth_sessions
+SET revoked_at = $1
+WHERE token_hash = $2 AND revoked_at IS NULL
+`
+
+type RevokeSessionByTokenHashParams struct {
+	RevokedAt pgtype.Timestamptz
+	TokenHash []byte
+}
+
+func (q *Queries) RevokeSessionByTokenHash(ctx context.Context, arg RevokeSessionByTokenHashParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeSessionByTokenHash, arg.RevokedAt, arg.TokenHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const sweepExpiredSessions = `-- name: SweepExpiredSessions :execrows
+DELETE FROM auth_sessions
+WHERE expires_at < $1::timestamptz
+   OR (revoked_at IS NOT NULL AND revoked_at < $1::timestamptz)
+`
+
+// SweepExpiredSessions removes rows that can no longer authenticate anything.
+// Revoked rows are kept for a grace period rather than deleted immediately, so
+// "when did I sign out" stays answerable for a while.
+func (q *Queries) SweepExpiredSessions(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
+	result, err := q.db.Exec(ctx, sweepExpiredSessions, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const touchAuthSession = `-- name: TouchAuthSession :exec
 UPDATE auth_sessions SET last_seen_at = $2 WHERE id = $1
 `
@@ -323,4 +539,41 @@ type TouchAuthSessionParams struct {
 func (q *Queries) TouchAuthSession(ctx context.Context, arg TouchAuthSessionParams) error {
 	_, err := q.db.Exec(ctx, touchAuthSession, arg.ID, arg.LastSeenAt)
 	return err
+}
+
+const updatePasswordHash = `-- name: UpdatePasswordHash :exec
+UPDATE auth_passwords SET hash = $2 WHERE auth_provider_id = $1
+`
+
+type UpdatePasswordHashParams struct {
+	AuthProviderID uuid.UUID
+	Hash           string
+}
+
+// UpdatePasswordHash re-hashes at the current cost. A successful sign-in is the
+// only moment the plaintext is available to do it with.
+func (q *Queries) UpdatePasswordHash(ctx context.Context, arg UpdatePasswordHashParams) error {
+	_, err := q.db.Exec(ctx, updatePasswordHash, arg.AuthProviderID, arg.Hash)
+	return err
+}
+
+const userProfileByEmail = `-- name: UserProfileByEmail :one
+SELECT user_id, email, display_name, timezone, created_at, updated_at FROM user_profiles WHERE email = $1
+`
+
+// UserProfileByEmail supports linking a federated identity to an account that
+// already exists. Only ever called with an email the provider marked verified —
+// matching on an unverified one is an account-takeover route.
+func (q *Queries) UserProfileByEmail(ctx context.Context, email string) (UserProfile, error) {
+	row := q.db.QueryRow(ctx, userProfileByEmail, email)
+	var i UserProfile
+	err := row.Scan(
+		&i.UserID,
+		&i.Email,
+		&i.DisplayName,
+		&i.Timezone,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

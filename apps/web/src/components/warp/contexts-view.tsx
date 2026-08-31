@@ -1,21 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { ArchiveIcon, PlusIcon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
   TableBody,
@@ -25,7 +14,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ContextChip } from "@/components/warp/context-chip"
-import { accounts, autonomyRules, contexts } from "@/lib/mock/data"
+import { ContextForm } from "@/components/warp/context-form"
+import { useContexts } from "@/components/warp/contexts-provider"
+import { accounts, autonomyRules } from "@/lib/mock/data"
 import type { Context } from "@/lib/mock/types"
 
 /**
@@ -34,7 +25,11 @@ import type { Context } from "@/lib/mock/types"
  * with a manager from reaching a training partner.
  */
 export function ContextsView() {
-  const [editing, setEditing] = React.useState<Context | null>(null)
+  const { contexts } = useContexts()
+  const [form, setForm] = React.useState<{ open: boolean; context: Context | null }>({
+    open: false,
+    context: null,
+  })
 
   return (
     <div className="space-y-4">
@@ -44,7 +39,7 @@ export function ContextsView() {
           overrides them. Everything — signals, tasks, people, memory notes, autonomy —
           hangs off one of these.
         </p>
-        <Button size="sm" variant="outline">
+        <Button size="sm" onClick={() => setForm({ open: true, context: null })}>
           <PlusIcon /> New context
         </Button>
       </div>
@@ -76,6 +71,7 @@ export function ContextsView() {
                     <div className={context.parentId ? "pl-5" : undefined}>
                       <ContextChip
                         contextId={context.id}
+                        preview={{ name: context.name, kind: context.kind }}
                         className="text-sm text-foreground"
                       />
                       <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
@@ -101,7 +97,7 @@ export function ContextsView() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setEditing(context)}
+                      onClick={() => setForm({ open: true, context })}
                     >
                       Edit
                     </Button>
@@ -113,54 +109,11 @@ export function ContextsView() {
         </Table>
       </div>
 
-      <Sheet open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
-        <SheetContent className="w-full data-[side=right]:sm:max-w-xl">
-          {editing ? (
-            <>
-              <SheetHeader>
-                <SheetTitle>{editing.name}</SheetTitle>
-                <SheetDescription>
-                  Changes here affect every draft written for this context, and nothing
-                  outside it.
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="space-y-4 px-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="ctx-name">Name</Label>
-                  <Input id="ctx-name" defaultValue={editing.name} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ctx-hours">Active hours</Label>
-                  <Input id="ctx-hours" defaultValue={editing.activeHours} />
-                  <p className="text-xs text-muted-foreground">
-                    Outside these hours the context stays quiet — no reminders, no
-                    surfacing during a session scoped elsewhere.
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ctx-tone">Tone profile</Label>
-                  <Textarea id="ctx-tone" rows={5} defaultValue={editing.toneProfile} />
-                  <p className="text-xs text-muted-foreground">
-                    Injected into every draft for this context. It never leaks into
-                    another one.
-                  </p>
-                </div>
-              </div>
-
-              <SheetFooter>
-                <Button variant="ghost" className="mr-auto">
-                  <ArchiveIcon /> Archive context
-                </Button>
-                <Button variant="outline" onClick={() => setEditing(null)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => setEditing(null)}>Save</Button>
-              </SheetFooter>
-            </>
-          ) : null}
-        </SheetContent>
-      </Sheet>
+      <ContextForm
+        context={form.context}
+        open={form.open}
+        onOpenChange={(open) => setForm((current) => ({ ...current, open }))}
+      />
     </div>
   )
 }

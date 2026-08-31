@@ -1,6 +1,7 @@
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppHeader } from "@/components/warp/app-header"
 import { AppSidebar } from "@/components/warp/app-sidebar"
+import { ContextsProvider } from "@/components/warp/contexts-provider"
 import { SessionProvider } from "@/components/warp/session-provider"
 import { requireSession } from "@/lib/api/session"
 
@@ -14,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <SessionProvider>
+      <ContextsProvider>
       <SidebarProvider>
         <AppSidebar email={account?.user.email} />
         <SidebarInset className="min-w-0">
@@ -23,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </main>
         </SidebarInset>
       </SidebarProvider>
+      </ContextsProvider>
     </SessionProvider>
   )
 }
