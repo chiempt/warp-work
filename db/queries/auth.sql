@@ -56,3 +56,34 @@ UPDATE auth_providers SET last_login_at = $2 WHERE id = $1;
 
 -- name: GetUserProfile :one
 SELECT * FROM user_profiles WHERE user_id = $1;
+
+-- LockRegistration serialises registration attempts.
+--
+-- "Is there already an owner?" cannot be answered safely with a plain SELECT:
+-- at READ COMMITTED two concurrent transactions both see none and both insert.
+-- A transaction-scoped advisory lock closes that window without a schema
+-- constraint that would foreclose multi-user later. Released on commit or
+-- rollback, automatically.
+-- name: LockRegistration :exec
+SELECT pg_advisory_xact_lock(4919);
+
+-- name: OwnerExists :one
+SELECT EXISTS (SELECT 1 FROM users);
+
+-- name: CreateUser :one
+INSERT INTO users (id) VALUES ($1) RETURNING *;
+
+-- Timezone is deliberately absent: the column default is the single place that
+-- value is written down.
+-- name: CreateUserProfile :one
+INSERT INTO user_profiles (user_id, email, display_name)
+VALUES ($1, $2, $3)
+RETURNING *;
+
+-- name: CreateAuthProvider :one
+INSERT INTO auth_providers (id, user_id, kind, subject, email, is_primary)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING *;
+
+-- name: CreateAuthPassword :exec
+INSERT INTO auth_passwords (auth_provider_id, hash) VALUES ($1, $2);

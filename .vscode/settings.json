@@ -1,0 +1,52 @@
+{
+  // --- Go ------------------------------------------------------------------
+  "[go]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": { "source.organizeImports": "explicit" },
+    "editor.defaultFormatter": "golang.go"
+  },
+  "go.useLanguageServer": true,
+  "go.lintTool": "golangci-lint",
+  "go.lintOnSave": "package",
+  // Tests that touch Postgres read the same configuration as the services.
+  "go.testEnvFile": "${workspaceFolder}/infra/.env",
+  "gopls": {
+    "ui.semanticTokens": true,
+    "ui.diagnostic.staticcheck": true
+  },
+
+  // --- Generated code is not editable --------------------------------------
+  // The project rule is that nothing here is hand-written: it is regenerated
+  // from db/migrations + db/queries, and from docs/api/openapi.yaml. Marking
+  // it read-only turns "don't edit this" from a comment into something the
+  // editor enforces.
+  "files.readonlyInclude": {
+    "internal/store/**": true,
+    "apps/api/internal/api/**": true
+  },
+
+  // --- The OpenAPI document is the source of truth for the API -------------
+  // Schema association gives completion and validation while editing it.
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json": "docs/api/openapi.yaml"
+  },
+
+  // --- Noise ---------------------------------------------------------------
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "internal/store": true,
+    "apps/api/internal/api": true,
+    "**/pnpm-lock.yaml": true,
+    "**/go.sum": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/bin/**": true
+  },
+
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "[markdown]": { "files.trimTrailingWhitespace": false }
+}

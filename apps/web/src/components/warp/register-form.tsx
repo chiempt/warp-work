@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GoogleButton, OrDivider } from "@/components/warp/google-button"
+import { api } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
 import { OWNER_TIME_ZONE } from "@/lib/format"
 
@@ -51,13 +52,35 @@ export function RegisterForm() {
     values.passphrase.length >= MIN_PASSPHRASE &&
     values.confirm === values.passphrase
 
-  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const [failure, setFailure] = React.useState<string | null>(null)
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setTouched(true)
     if (!complete) return
-    // UI-only: the real form posts to the API, which creates the owner and the session.
+
     setPending(true)
-    router.push("/")
+    setFailure(null)
+
+    const { response, error } = await api.POST("/api/v1/auth/register", {
+      body: {
+        email: values.email.trim(),
+        password: values.passphrase,
+        displayName: values.name.trim(),
+      },
+    })
+
+    // Registration signs the new owner straight in — the API opens the session in the
+    // same transaction that creates them, so there is no window where the account
+    // exists and cannot be used.
+    if (response.ok) {
+      router.replace("/")
+      router.refresh()
+      return
+    }
+
+    setPending(false)
+    setFailure(messageFor(response.status, error))
   }
 
   return (
@@ -70,13 +93,7 @@ export function RegisterForm() {
       </header>
 
       <div className="space-y-3">
-        <GoogleButton
-          label="Sign up with Google"
-          onStart={() => {
-            setPending(true)
-            router.push("/")
-          }}
-        />
+        <GoogleButton label="Sign up with Google" onStart={() => setPending(true)} />
         <p className="text-xs leading-relaxed text-muted-foreground">
           Creates the account and keeps the grant, so Gmail, Calendar and Drive are
           connected from the start.
@@ -165,6 +182,12 @@ export function RegisterForm() {
           ) : null}
         </div>
 
+        {failure ? (
+          <p role="alert" className="text-sm text-destructive">
+            {failure}
+          </p>
+        ) : null}
+
         <Button
           type="submit"
           size="lg"
@@ -198,4 +221,20 @@ export function RegisterForm() {
       </div>
     </div>
   )
+}
+
+/**
+ * 409 is the one worth naming. Warp has a single owner, and the API closes this route
+ * once that row exists — so a conflict here is not a retryable error, it means the
+ * account already exists and the person wants the other screen.
+ */
+function messageFor(status: number, error: unknown): string {
+  if (status === 409) {
+    return "An owner account already exists on this server. Sign in instead."
+  }
+  if (status === 422) return "Check the details above and try again."
+  if (status === 501) return "Registration is not available on this server yet."
+
+  const envelope = error as { error?: { message?: string } } | undefined
+  return envelope?.error?.message ?? "Could not create the account. The API did not answer."
 }

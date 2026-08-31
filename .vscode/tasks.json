@@ -1,0 +1,85 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "check (vet + test + openapi)",
+      "type": "shell",
+      "command": "make check",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "make test",
+      "group": "test",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "generate (sqlc + ogen)",
+      "type": "shell",
+      "command": "make generate",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "openapi — sinh lại server từ spec",
+      "type": "shell",
+      "command": "make openapi",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "sqlc — sinh lại internal/store",
+      "type": "shell",
+      "command": "make sqlc",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "migrate up",
+      "type": "shell",
+      "command": "make migrate-up",
+      "problemMatcher": []
+    },
+    {
+      "label": "migrate status",
+      "type": "shell",
+      "command": "make migrate-status",
+      "problemMatcher": []
+    },
+    {
+      "label": "migrate new",
+      "type": "shell",
+      "command": "make migrate-new name=${input:migrationName}",
+      "problemMatcher": []
+    },
+    {
+      "label": "seed",
+      "type": "shell",
+      "command": "make seed",
+      "problemMatcher": []
+    },
+    {
+      "label": "db reset (xoá sạch dữ liệu)",
+      "type": "shell",
+      "command": "make db-reset",
+      "problemMatcher": []
+    },
+    {
+      "label": "web: build",
+      "type": "shell",
+      "command": "pnpm build",
+      "options": { "cwd": "${workspaceFolder}/apps/web" },
+      "group": "build",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "migrationName",
+      "type": "promptString",
+      "description": "Tên migration, snake_case — ví dụ add_commitment_tags"
+    }
+  ]
+}

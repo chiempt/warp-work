@@ -24,6 +24,15 @@ type Repository interface {
 	LiveSessionByTokenHash(ctx context.Context, arg store.LiveSessionByTokenHashParams) (store.LiveSessionByTokenHashRow, error)
 	TouchAuthSession(ctx context.Context, arg store.TouchAuthSessionParams) error
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (store.UserProfile, error)
+
+	// Registration. These run together inside one transaction — see
+	// Store.InTx and Service.Register.
+	LockRegistration(ctx context.Context) error
+	OwnerExists(ctx context.Context) (bool, error)
+	CreateUser(ctx context.Context, id uuid.UUID) (store.User, error)
+	CreateUserProfile(ctx context.Context, arg store.CreateUserProfileParams) (store.UserProfile, error)
+	CreateAuthProvider(ctx context.Context, arg store.CreateAuthProviderParams) (store.AuthProvider, error)
+	CreateAuthPassword(ctx context.Context, arg store.CreateAuthPasswordParams) error
 }
 
 var _ Repository = (*store.Queries)(nil)

@@ -17,18 +17,34 @@ import { GoogleMark } from "@/components/warp/source-marks"
  */
 export function GoogleButton({
   label = "Continue with Google",
+  returnTo = "/",
   onStart,
 }: {
   label?: string
+  /** Where to land afterwards. The API rejects anything that is not a local path. */
+  returnTo?: string
   onStart?: () => void
 }) {
+  // A real navigation, not a fetch. The browser has to *leave* for Google's consent
+  // screen and come back to the callback, and the callback is what sets the session
+  // cookie — an XHR could neither follow the redirect chain nor receive the cookie.
+  const start = () => {
+    onStart?.()
+    // Not an internal page, so the lint rule below does not apply: this path is
+    // rewritten to the Go API, which answers 302 to Google's consent screen.
+    // `router.push` would try to render it as a route and the sign-in would never
+    // leave the app.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = `/api/v1/auth/google/start?returnTo=${encodeURIComponent(returnTo)}`
+  }
+
   return (
     <Button
       type="button"
       variant="outline"
       size="lg"
       className="h-10 w-full"
-      onClick={onStart}
+      onClick={start}
     >
       <span className="size-4 shrink-0">
         <GoogleMark />

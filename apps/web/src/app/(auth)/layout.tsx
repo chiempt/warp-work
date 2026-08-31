@@ -1,6 +1,7 @@
 import { KineticText } from "@/components/ui/kinetic-text"
 import { WarpThreads } from "@/components/warp/warp-threads"
 import { cn } from "@/lib/utils"
+import { redirectIfSignedIn } from "@/lib/api/session"
 
 /**
  * The shell both auth screens share: the product on the left, the door on the right.
@@ -15,7 +16,9 @@ import { cn } from "@/lib/utils"
  *
  * Below `lg` the panel collapses to a header so the form is never under a fold.
  */
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default async function AuthLayout({ children }: { children: React.ReactNode }) {
+  await redirectIfSignedIn()
+
   return (
     <div className="grid min-h-dvh w-full min-w-0 grid-cols-1 grid-rows-[auto_1fr] lg:grid-cols-2 lg:grid-rows-1">
       <aside

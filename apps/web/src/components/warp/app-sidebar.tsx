@@ -31,6 +31,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { CommandMenu } from "@/components/warp/command-menu"
 import { ContextChip } from "@/components/warp/context-chip"
 import { useSession } from "@/components/warp/session-provider"
+import { SignOutButton } from "@/components/warp/sign-out-button"
 import { cn } from "@/lib/utils"
 import { commitments, contexts, proposedActions, tasks } from "@/lib/mock/data"
 
@@ -64,7 +65,7 @@ const nav = [
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ] as const
 
-export function AppSidebar() {
+export function AppSidebar({ email }: { email?: string }) {
   const pathname = usePathname()
   const { session, scope } = useSession()
 
@@ -215,25 +216,12 @@ export function AppSidebar() {
               aria-hidden
               className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground"
             >
-              C
+              {(email ?? "?").charAt(0).toUpperCase()}
             </span>
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-              chiem.pt@baohiemtasco.vn
+              {email ?? "not signed in"}
             </span>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Link
-                    href="/login"
-                    aria-label="Sign out"
-                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden"
-                  >
-                    <LogOutIcon className="size-3.5" />
-                  </Link>
-                }
-              />
-              <TooltipContent side="right">Sign out</TooltipContent>
-            </Tooltip>
+            <SignOutButton />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

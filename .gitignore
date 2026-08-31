@@ -30,4 +30,9 @@ yarn-error.log*
 .DS_Store
 .idea/
 .vscode/*
+# Shared editor setup: debug configs, tasks, and the settings that make
+# generated code read-only. Everything else under .vscode is per-person.
 !.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json

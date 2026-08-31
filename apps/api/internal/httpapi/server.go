@@ -18,7 +18,6 @@ import (
 	"github.com/chiempham/warp-work/internal/auth"
 	"github.com/chiempham/warp-work/internal/config"
 	"github.com/chiempham/warp-work/internal/platform/postgres"
-	"github.com/chiempham/warp-work/internal/store"
 )
 
 // Server owns the HTTP listener and its dependencies.
@@ -44,7 +43,7 @@ func New(cfg config.Config, logger *slog.Logger, pool *postgres.Pool) (*Server, 
 	// The pool may be nil in tests that never reach the database.
 	var authSvc *auth.Service
 	if pool != nil {
-		authSvc = auth.NewService(store.New(pool), nil)
+		authSvc = auth.NewService(auth.NewPgxStore(pool), nil)
 	}
 
 	s := &Server{echo: e, cfg: cfg, logger: logger, pool: pool, auth: authSvc}

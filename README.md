@@ -30,9 +30,21 @@ run through `go tool`.
 ```bash
 make setup        # env file, warp role + database, migrations — run once
 make run-api      # http://localhost:8080
+
+# Create the owner. This is the only thing that does, and it succeeds once:
+# a second attempt is a 409, not a second account.
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H 'content-type: application/json' \
+  -d '{"email":"you@example.com","password":"a-long-enough-password","displayName":"Your Name"}'
+
+make seed         # fixture contexts, attached to whoever registered
 make run-worker   # in another shell
 make run-web      # http://localhost:3000
 ```
+
+`make seed` deliberately refuses to run before registration. Seeding an owner
+would create an account with no sign-in method — `register` would refuse it as
+an existing owner and `login` would find no credential, locking everyone out.
 
 `make setup` provisions a non-superuser `warp` role owning a `warp` database, installs `pgvector`
 (which needs a superuser once), generates the credential encryption key, and writes

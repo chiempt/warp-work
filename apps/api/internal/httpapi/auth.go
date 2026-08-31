@@ -20,6 +20,45 @@ import (
 // unauthenticated and nothing says why.
 const sessionCookieName = "warp_session"
 
+// Register creates the owner and signs them in.
+//
+// Warp has one owner, so this succeeds at most once for the life of the
+// installation. A second attempt is a 409, not a second account — the check
+// and the four inserts happen in one transaction inside the service.
+func (h *Handler) Register(ctx context.Context, req *api.RegisterRequest) (api.RegisterRes, error) {
+	session, err := h.auth.Register(ctx, auth.RegisterParams{
+		Email:       req.Email,
+		Password:    req.Password,
+		DisplayName: req.DisplayName,
+	}, clientInfoFrom(ctx))
+
+	switch {
+	case errors.Is(err, auth.ErrOwnerExists):
+		return &api.ErrorEnvelope{Error: api.Error{
+			Code:    "owner_exists",
+			Message: "this installation already has an owner; sign in instead",
+		}}, nil
+
+	case errors.Is(err, auth.ErrInvalidInput):
+		// Reached only for what the schema cannot express — a display name
+		// that passed minLength but is entirely whitespace, say.
+		return nil, ErrBadRequest(err.Error())
+
+	case err != nil:
+		return nil, err
+	}
+
+	current, err := h.currentSession(ctx, session)
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.CurrentSessionHeaders{
+		SetCookie: api.NewOptString(h.sessionCookie(session.Token, session.ExpiresAt).String()),
+		Response:  current,
+	}, nil
+}
+
 // Login signs the owner in with an email and password.
 //
 // The response type chosen here is what sets the status code — 200, 401 or 429

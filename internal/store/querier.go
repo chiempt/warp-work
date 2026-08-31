@@ -13,11 +13,17 @@ import (
 type Querier interface {
 	AssignSignalContext(ctx context.Context, arg AssignSignalContextParams) error
 	ClearFailedLogins(ctx context.Context, authProviderID uuid.UUID) error
+	CreateAuthPassword(ctx context.Context, arg CreateAuthPasswordParams) error
+	CreateAuthProvider(ctx context.Context, arg CreateAuthProviderParams) (AuthProvider, error)
 	CreateAuthSession(ctx context.Context, arg CreateAuthSessionParams) (AuthSession, error)
 	// id is supplied by the application as UUIDv7 rather than taken from the
 	// column default, so rows sort by creation time. See docs/conventions.md §3.
 	// created_at and updated_at come from defaults and a trigger.
 	CreateContext(ctx context.Context, arg CreateContextParams) (Context, error)
+	CreateUser(ctx context.Context, id uuid.UUID) (User, error)
+	// Timezone is deliberately absent: the column default is the single place that
+	// value is written down.
+	CreateUserProfile(ctx context.Context, arg CreateUserProfileParams) (UserProfile, error)
 	GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 	GetContext(ctx context.Context, id uuid.UUID) (Context, error)
 	// GetPasswordCredential is the whole of what a password sign-in needs, in one
@@ -50,6 +56,14 @@ type Querier interface {
 	// Expiry and revocation are part of the predicate, so a caller cannot forget to
 	// check them.
 	LiveSessionByTokenHash(ctx context.Context, arg LiveSessionByTokenHashParams) (LiveSessionByTokenHashRow, error)
+	// LockRegistration serialises registration attempts.
+	//
+	// "Is there already an owner?" cannot be answered safely with a plain SELECT:
+	// at READ COMMITTED two concurrent transactions both see none and both insert.
+	// A transaction-scoped advisory lock closes that window without a schema
+	// constraint that would foreclose multi-user later. Released on commit or
+	// rollback, automatically.
+	LockRegistration(ctx context.Context) error
 	// MarkAccountFailed stops the account rather than letting it return partial
 	// data: a report must never be silently trusted when a source was down.
 	MarkAccountFailed(ctx context.Context, arg MarkAccountFailedParams) error
@@ -69,6 +83,7 @@ type Querier interface {
 	MarkProviderUsed(ctx context.Context, arg MarkProviderUsedParams) error
 	// MarkSignalProcessed sets the only column on a signal that may ever change.
 	MarkSignalProcessed(ctx context.Context, arg MarkSignalProcessedParams) error
+	OwnerExists(ctx context.Context) (bool, error)
 	// RecordFailedLogin counts the attempt and locks the credential once the count
 	// reaches the threshold. Counted in the database rather than in Redis: a
 	// lockout that evaporates when the cache restarts is not a lockout.

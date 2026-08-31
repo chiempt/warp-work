@@ -24,6 +24,58 @@ func (q *Queries) ClearFailedLogins(ctx context.Context, authProviderID uuid.UUI
 	return err
 }
 
+const createAuthPassword = `-- name: CreateAuthPassword :exec
+INSERT INTO auth_passwords (auth_provider_id, hash) VALUES ($1, $2)
+`
+
+type CreateAuthPasswordParams struct {
+	AuthProviderID uuid.UUID
+	Hash           string
+}
+
+func (q *Queries) CreateAuthPassword(ctx context.Context, arg CreateAuthPasswordParams) error {
+	_, err := q.db.Exec(ctx, createAuthPassword, arg.AuthProviderID, arg.Hash)
+	return err
+}
+
+const createAuthProvider = `-- name: CreateAuthProvider :one
+INSERT INTO auth_providers (id, user_id, kind, subject, email, is_primary)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id, kind, subject, email, is_primary, linked_at, last_login_at
+`
+
+type CreateAuthProviderParams struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Kind      AuthProviderKind
+	Subject   string
+	Email     *string
+	IsPrimary bool
+}
+
+func (q *Queries) CreateAuthProvider(ctx context.Context, arg CreateAuthProviderParams) (AuthProvider, error) {
+	row := q.db.QueryRow(ctx, createAuthProvider,
+		arg.ID,
+		arg.UserID,
+		arg.Kind,
+		arg.Subject,
+		arg.Email,
+		arg.IsPrimary,
+	)
+	var i AuthProvider
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Kind,
+		&i.Subject,
+		&i.Email,
+		&i.IsPrimary,
+		&i.LinkedAt,
+		&i.LastLoginAt,
+	)
+	return i, err
+}
+
 const createAuthSession = `-- name: CreateAuthSession :one
 INSERT INTO auth_sessions (id, user_id, auth_provider_id, token_hash, expires_at, user_agent, ip)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -62,6 +114,45 @@ func (q *Queries) CreateAuthSession(ctx context.Context, arg CreateAuthSessionPa
 		&i.RevokedAt,
 		&i.UserAgent,
 		&i.Ip,
+	)
+	return i, err
+}
+
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (id) VALUES ($1) RETURNING id, created_at, updated_at
+`
+
+func (q *Queries) CreateUser(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, createUser, id)
+	var i User
+	err := row.Scan(&i.ID, &i.CreatedAt, &i.UpdatedAt)
+	return i, err
+}
+
+const createUserProfile = `-- name: CreateUserProfile :one
+INSERT INTO user_profiles (user_id, email, display_name)
+VALUES ($1, $2, $3)
+RETURNING user_id, email, display_name, timezone, created_at, updated_at
+`
+
+type CreateUserProfileParams struct {
+	UserID      uuid.UUID
+	Email       string
+	DisplayName string
+}
+
+// Timezone is deliberately absent: the column default is the single place that
+// value is written down.
+func (q *Queries) CreateUserProfile(ctx context.Context, arg CreateUserProfileParams) (UserProfile, error) {
+	row := q.db.QueryRow(ctx, createUserProfile, arg.UserID, arg.Email, arg.DisplayName)
+	var i UserProfile
+	err := row.Scan(
+		&i.UserID,
+		&i.Email,
+		&i.DisplayName,
+		&i.Timezone,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -174,6 +265,22 @@ func (q *Queries) LiveSessionByTokenHash(ctx context.Context, arg LiveSessionByT
 	return i, err
 }
 
+const lockRegistration = `-- name: LockRegistration :exec
+SELECT pg_advisory_xact_lock(4919)
+`
+
+// LockRegistration serialises registration attempts.
+//
+// "Is there already an owner?" cannot be answered safely with a plain SELECT:
+// at READ COMMITTED two concurrent transactions both see none and both insert.
+// A transaction-scoped advisory lock closes that window without a schema
+// constraint that would foreclose multi-user later. Released on commit or
+// rollback, automatically.
+func (q *Queries) LockRegistration(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockRegistration)
+	return err
+}
+
 const markProviderUsed = `-- name: MarkProviderUsed :exec
 UPDATE auth_providers SET last_login_at = $2 WHERE id = $1
 `
@@ -186,6 +293,17 @@ type MarkProviderUsedParams struct {
 func (q *Queries) MarkProviderUsed(ctx context.Context, arg MarkProviderUsedParams) error {
 	_, err := q.db.Exec(ctx, markProviderUsed, arg.ID, arg.LastLoginAt)
 	return err
+}
+
+const ownerExists = `-- name: OwnerExists :one
+SELECT EXISTS (SELECT 1 FROM users)
+`
+
+func (q *Queries) OwnerExists(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, ownerExists)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const recordFailedLogin = `-- name: RecordFailedLogin :one

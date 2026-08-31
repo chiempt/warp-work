@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GoogleButton, OrDivider } from "@/components/warp/google-button"
+import { api } from "@/lib/api/client"
 
 type State = "idle" | "google" | "submitting" | "error"
 
@@ -28,15 +29,37 @@ export function LoginForm() {
   const [email, setEmail] = React.useState("")
   const [passphrase, setPassphrase] = React.useState("")
 
-  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const [failure, setFailure] = React.useState<string | null>(null)
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!email || !passphrase) {
       setState("error")
+      setFailure("Enter both an email and a passphrase.")
       return
     }
-    // UI-only: the real form posts to the API and the API sets the session cookie.
+
     setState("submitting")
-    router.push("/")
+    setFailure(null)
+
+    const { response, error } = await api.POST("/api/v1/auth/login", {
+      body: { email, password: passphrase },
+    })
+
+    // The session cookie is set by the API on this response. It is HttpOnly, so
+    // there is nothing to read here and nothing to store — the browser has it.
+    if (response.ok) {
+      // `replace` so the back button does not return to a form that has already
+      // succeeded. `refresh` because the gate admitting us runs on the server: it
+      // invalidates the router cache so the shell is fetched with the new cookie
+      // rather than from an entry created while nobody was signed in.
+      router.replace("/")
+      router.refresh()
+      return
+    }
+
+    setState("error")
+    setFailure(messageFor(response.status, error))
   }
 
   return (
@@ -49,12 +72,7 @@ export function LoginForm() {
       </header>
 
       <div className="space-y-3">
-        <GoogleButton
-          onStart={() => {
-            setState("google")
-            router.push("/")
-          }}
-        />
+        <GoogleButton onStart={() => setState("google")} />
         <p className="text-xs leading-relaxed text-muted-foreground">
           The same Google account Warp reads mail and calendar from. Pinned to that one
           account — any other is refused.
@@ -103,9 +121,9 @@ export function LoginForm() {
           Keep this device signed in for 30 days
         </Label>
 
-        {state === "error" ? (
+        {failure ? (
           <p role="alert" className="text-sm text-destructive">
-            Enter both an email and a passphrase.
+            {failure}
           </p>
         ) : null}
 
@@ -146,4 +164,18 @@ export function LoginForm() {
       </div>
     </div>
   )
+}
+
+/**
+ * The API answers a wrong password and an unregistered address identically, so this
+ * does too. Reporting them differently would turn the form into a way to find out which
+ * addresses exist.
+ */
+function messageFor(status: number, error: unknown): string {
+  if (status === 401) return "Email or passphrase is incorrect."
+  if (status === 429) return "Too many attempts. Try again in a few minutes."
+  if (status === 501) return "Sign-in is not available on this server yet."
+
+  const envelope = error as { error?: { message?: string } } | undefined
+  return envelope?.error?.message ?? "Could not sign in. The API did not answer."
 }
