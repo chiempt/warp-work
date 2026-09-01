@@ -7,6 +7,7 @@ import {
   LockIcon,
   PencilLineIcon,
   RefreshCwIcon,
+  TriangleAlertIcon,
   UnplugIcon,
 } from "lucide-react"
 
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Card,
   CardAction,
@@ -51,19 +53,30 @@ import {
   GmailMark,
   InstagramMark,
   MessengerMark,
+  TelegramMark,
   ZaloOaMark,
 } from "@/components/warp/source-marks"
 import { ReliabilityBadge } from "@/components/warp/reliability"
 import { cn } from "@/lib/utils"
 import { formatRelative, formatStamp } from "@/lib/format"
 import { accounts, NOW } from "@/lib/mock/data"
-import type { Account, AccountProvider } from "@/lib/mock/types"
+import type {
+  Account,
+  AccountProvider,
+  AccountReliability,
+} from "@/lib/mock/types"
 
-type Availability = "connected" | "available" | "phase_4"
+type Availability = "connected" | "available" | "phase_4" | "unofficial"
 
 interface Connector {
   provider: AccountProvider
   name: string
+  /**
+   * The tier this source can ever reach. It is a property of the vendor's API, not
+   * of how well the connector is written: a source with no documented API cannot be
+   * trusted to be complete however careful the client is.
+   */
+  reliability?: AccountReliability
   /** What the vendor actually offers — copied from context doc §4, not softened. */
   apiStatus: string
   /**
@@ -139,6 +152,35 @@ const connectors: Connector[] = [
     ],
   },
   {
+    provider: "telegram",
+    name: "Telegram",
+    apiStatus:
+      "Official Bot API — documented, stable, and no risk to the account it serves.",
+    services: [
+      {
+        icon: TelegramMark,
+        label: "Bot inbox",
+        detail: "messages sent to your bot, and groups you add it to",
+      },
+    ],
+    scopes: ["bot:receive_updates", "bot:send_message"],
+    availability: "available",
+    note: "A bot sees what is addressed to it — a direct message to the bot, or a group it has been added to. It cannot read your conversations with other people, and no Telegram API offers that. In practice this is a forwarding address that happens to live in Telegram, which is exactly what makes it safe to connect.",
+    credentialFields: [
+      {
+        id: "bot_token",
+        label: "Bot token",
+        placeholder: "From @BotFather",
+        secret: true,
+      },
+      {
+        id: "chat_id",
+        label: "Allowed chat ID",
+        placeholder: "Only this chat is ingested",
+      },
+    ],
+  },
+  {
     provider: "instagram_business",
     name: "Instagram Business",
     apiStatus: "Official Graph API — Business and Creator accounts only.",
@@ -156,19 +198,61 @@ const connectors: Connector[] = [
       { id: "ig_id", label: "Instagram Business ID", placeholder: "17841400000000000" },
     ],
   },
+  {
+    provider: "zalo_personal",
+    name: "Zalo personal",
+    reliability: "unofficial",
+    apiStatus:
+      "No official API. Reaching a personal account means an unofficial client, and Zalo bans accounts for it.",
+    services: [
+      {
+        icon: ZaloOaMark,
+        label: "Personal messages",
+        detail: "conversations on your own Zalo account",
+      },
+    ],
+    scopes: [],
+    availability: "unofficial",
+    note: "Enabled by the owner against the standing advice. Everything ingested here carries the unofficial tier, so any report drawn from it says it may be incomplete — and if the account is banned, the connector stops and the history it fed stays.",
+    credentialFields: [
+      { id: "zalo_phone", label: "Phone number", placeholder: "+84…" },
+      {
+        id: "zalo_session",
+        label: "Session credential",
+        placeholder: "••••••••••••",
+        secret: true,
+      },
+    ],
+  },
+  {
+    provider: "facebook_personal",
+    name: "Facebook personal messages",
+    reliability: "unofficial",
+    apiStatus:
+      "Meta publishes no API for a personal inbox. Any route in is a logged-in browser being driven.",
+    services: [
+      {
+        icon: MessengerMark,
+        label: "Personal inbox",
+        detail: "Messenger conversations on your own account",
+      },
+    ],
+    scopes: [],
+    availability: "unofficial",
+    note: "Enabled by the owner against the standing advice. There is no documented interface behind this, so it breaks whenever Meta changes the page it is reading — expect it to fail silently and often, and treat a context that depends on it as one that will lose messages.",
+    credentialFields: [
+      {
+        id: "fb_session",
+        label: "Session credential",
+        placeholder: "••••••••••••",
+        secret: true,
+      },
+    ],
+  },
 ]
 
 /** Permanently out of scope. Listed so the question is answered once and not re-asked. */
 const refused = [
-  {
-    name: "Zalo personal",
-    reason:
-      "No official API. Every route in is an unofficial client, and using one risks the account being banned — which would cost more than the integration is worth.",
-  },
-  {
-    name: "Facebook personal messages",
-    reason: "Meta publishes no API for a personal inbox. This is not a matter of effort.",
-  },
   {
     name: "Instagram personal",
     reason: "No API outside Business and Creator accounts.",
@@ -232,7 +316,7 @@ function ConnectorCard({ connector }: { connector: Connector }) {
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
           {connector.name}
-          <ReliabilityBadge reliability="official" />
+          <ReliabilityBadge reliability={connector.reliability ?? "official"} />
           {connector.availability === "phase_4" ? (
             <Badge variant="outline" className="font-normal">
               phase 4
@@ -246,6 +330,17 @@ function ConnectorCard({ connector }: { connector: Connector }) {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {connector.availability === "unofficial" ? (
+          <div className="flex items-start gap-3 rounded-lg border border-warning/35 bg-warning/8 px-3 py-2.5 text-sm">
+            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-warning" />
+            <p className="text-muted-foreground">
+              <span className="text-foreground">No documented API.</span> This reads a
+              personal account through a route the vendor does not support and may act
+              against. It can stop working without notice, and it can cost the account.
+            </p>
+          </div>
+        ) : null}
+
         <ul className="grid gap-2 sm:grid-cols-3">
           {connector.services.map((service) => (
             <li
@@ -272,9 +367,16 @@ function ConnectorCard({ connector }: { connector: Connector }) {
         ) : null}
 
         <p className="text-xs text-muted-foreground">
-          <span className="text-foreground">Scopes requested:</span>{" "}
-          <span className="font-mono">{connector.scopes.join(", ")}</span>. Credentials are
-          encrypted at rest, never returned by the API, and never placed in a prompt.
+          {/* A source with no documented API has no scopes to request — saying
+              "Scopes requested:" and then nothing is worse than not saying it. */}
+          {connector.scopes.length > 0 ? (
+            <>
+              <span className="text-foreground">Scopes requested:</span>{" "}
+              <span className="font-mono">{connector.scopes.join(", ")}</span>.{" "}
+            </>
+          ) : null}
+          Credentials are encrypted at rest, never returned by the API, and never placed
+          in a prompt.
         </p>
         <p className="text-xs text-muted-foreground">{connector.note}</p>
       </CardContent>
@@ -358,6 +460,7 @@ function ConnectButton({
   connector: Connector
   connected: boolean
 }) {
+  const [acknowledged, setAcknowledged] = React.useState(false)
   if (connector.availability === "phase_4") {
     return (
       <Button size="sm" variant="outline" disabled>
@@ -393,6 +496,20 @@ function ConnectButton({
           <DialogDescription>{connector.apiStatus}</DialogDescription>
         </DialogHeader>
 
+        {connector.availability === "unofficial" ? (
+          <Label className="flex items-start gap-3 rounded-lg border border-warning/35 bg-warning/8 px-3 py-2.5">
+            <Checkbox
+              checked={acknowledged}
+              onCheckedChange={(checked) => setAcknowledged(checked === true)}
+            />
+            <span className="text-xs leading-relaxed font-normal text-muted-foreground">
+              I understand this uses a route {connector.name.split(" ")[0]} does not
+              support, that the account may be suspended for it, and that anything Warp
+              derives from this source is marked as possibly incomplete.
+            </span>
+          </Label>
+        ) : null}
+
         <div className="space-y-3">
           {connector.credentialFields.map((field) => (
             <div key={field.id} className="space-y-1.5">
@@ -414,7 +531,13 @@ function ConnectButton({
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline">Cancel</Button>} />
-          <DialogClose render={<Button>Connect</Button>} />
+          <DialogClose
+            render={
+              <Button disabled={connector.availability === "unofficial" && !acknowledged}>
+                Connect
+              </Button>
+            }
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -53,6 +53,8 @@ func New(cfg config.Config, logger *slog.Logger, pool *postgres.Pool) (*Server, 
 
 	s := &Server{echo: e, cfg: cfg, logger: logger, pool: pool, auth: authSvc}
 
+	warnIfRedirectMismatched(logger, cfg.Google.RedirectURL, cfg.Web.BaseURL)
+
 	e.Use(defaultMiddleware(logger)...)
 	if err := s.routes(); err != nil {
 		return nil, err

@@ -14,10 +14,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create the owner account with an email and password
-         * @description Warp has exactly one owner (see §2 of the context document). This
-         *     endpoint therefore succeeds at most once: a second attempt is a 409,
-         *     not a second account. It is not a public sign-up.
+         * Create an account with an email and password
+         * @description Unrestricted. Warp runs on the owner's own machine, so there is no
+         *     stranger to keep out.
+         *
+         *     What remains out of scope is multi-user *behaviour* — no teams, no
+         *     sharing, no permissions. Two tables, `action_types` and
+         *     `prompt_templates`, carry no `user_id` and would be shared config if a
+         *     second account existed.
          */
         post: operations["register"];
         delete?: never;
@@ -284,6 +288,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a task by hand
+         * @description The manual path in, and a first-class one: a task decided in a meeting
+         *     leaves no signal to extract from, and losing it is worse than recording
+         *     it without a source.
+         *
+         *     What manual entry never does is pretend to be derived. `sourceSignalId`
+         *     is absent from the request on purpose — extraction sets it through the
+         *     service, and a hand-written task that could claim an email as its origin
+         *     would make the audit trail lie.
+         *
+         *     Three more fields are the server's to decide, not the client's: `id` is
+         *     a UUIDv7 generated before insert, `userId` comes from the session cookie
+         *     and never from the body, and `status` always starts `open`. Creating a
+         *     task that is already done is a create followed by a status change —
+         *     `completedAt` and `blockedReason` are consequences of that status, which
+         *     is why they are set by the status transition and not stated here.
+         *
+         *     `owner` is absent until Phase 3. The column accepts `agent`, but no
+         *     agent runs yet, so a task assigned to one would sit in a queue nothing
+         *     drains.
+         */
+        post: operations["createTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/commitments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a promise by hand
+         * @description Most hand-recorded commitments come from a phone call, which leaves no
+         *     signal at all. That is the case this endpoint exists for.
+         *
+         *     `evidenceSignalId` is absent, and this is the sharpest instance of that
+         *     rule anywhere in the API. A commitment is worth what its evidence is
+         *     worth: the owner clicks it and reads the exact sentence that created it.
+         *     A client able to set that field could point a promise it invented at
+         *     somebody's email — the trail would not merely be thin, it would be
+         *     false.
+         *
+         *     `isConfirmed` is absent for a different reason: the server sets it
+         *     `true` here. That column exists to mark what a model guessed, and holds
+         *     back reminders until the owner agrees. A promise the owner just typed is
+         *     confirmed by the act of typing it. Extraction takes the other path and
+         *     writes `false`.
+         *
+         *     As with tasks, `id`, `userId` and `status` are the server's. `status`
+         *     starts `open`, and `resolvedAt` is a consequence of leaving that state
+         *     rather than something a client states — the two are checked against each
+         *     other by `commitments_resolution_consistent`.
+         */
+        post: operations["createCommitment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -499,6 +580,219 @@ export interface components {
         SignalList: {
             items: components["schemas"]["Signal"][];
         };
+        /**
+         * @description `blocked` carries a reason and `done` carries a completion time — the
+         *     database checks both, so a status is never on its own.
+         * @enum {string}
+         */
+        TaskStatus: "open" | "in_progress" | "blocked" | "done" | "dropped";
+        /**
+         * @description Who is expected to do this. `agent` is not reachable before Phase 3;
+         *     it is described here because the column exists, not because it works.
+         * @enum {string}
+         */
+        TaskOwner: "me" | "agent";
+        Task: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: uuid
+             * @description The one context this task belongs to. Work spanning two contexts is
+             *     two tasks — unlike a signal, which can legitimately land in both.
+             */
+            contextId: string;
+            /**
+             * Format: uuid
+             * @description The signal extraction derived this from. Null for a task written by
+             *     hand, and that null is the honest answer — it is what tells the
+             *     owner nothing external vouches for this row.
+             */
+            sourceSignalId?: string | null;
+            /** Format: uuid */
+            parentTaskId?: string | null;
+            /**
+             * Format: uuid
+             * @description The promise this task discharges, if any. Null for most tasks: work
+             *     the owner set themselves has no counterparty waiting on it.
+             */
+            commitmentId?: string | null;
+            title: string;
+            detail?: string | null;
+            status: components["schemas"]["TaskStatus"];
+            owner: components["schemas"]["TaskOwner"];
+            /**
+             * Format: int32
+             * @description 1 is most urgent.
+             */
+            priority: number;
+            /**
+             * Format: date-time
+             * @description UTC. The browser converts to Asia/Ho_Chi_Minh, nothing else does.
+             */
+            dueAt?: string | null;
+            /** Format: int32 */
+            estimatedMinutes?: number | null;
+            /** @description Present exactly when status is `blocked`. */
+            blockedReason?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /**
+             * Format: date-time
+             * @description Present exactly when status is `done`.
+             */
+            completedAt?: string | null;
+        };
+        /**
+         * @description A task the owner writes by hand. Every field the server decides for
+         *     itself is absent rather than optional — see the operation description.
+         */
+        CreateTaskRequest: {
+            /**
+             * Format: uuid
+             * @description The one context this task belongs to. Work spanning two contexts is
+             *     two tasks, not one task in two places.
+             */
+            contextId: string;
+            /**
+             * @description minLength mirrors `tasks_title_not_blank`. maxLength is stricter
+             *     than the column, which is `text` — a 500-character title is a paste
+             *     accident, and refusing it here beats storing it.
+             */
+            title: string;
+            detail?: string | null;
+            /**
+             * Format: int32
+             * @description 1 is most urgent. Range mirrors `tasks_priority_range`. The column
+             *     also defaults to 3; the server resolves the value and always writes
+             *     it explicitly, so the two defaults cannot drift apart unnoticed.
+             * @default 3
+             */
+            priority: number;
+            /**
+             * Format: date-time
+             * @description UTC. Conversion to Asia/Ho_Chi_Minh happens in the browser, never
+             *     in a query and never here.
+             */
+            dueAt?: string | null;
+            /**
+             * Format: int32
+             * @description Mirrors `tasks_estimate_positive` — zero is not an estimate.
+             */
+            estimatedMinutes?: number | null;
+            /**
+             * Format: uuid
+             * @description Must be in the same context.
+             */
+            parentTaskId?: string | null;
+            /**
+             * Format: uuid
+             * @description The promise this task discharges, if any. Most tasks have none.
+             *     Must be in the same context — a composite foreign key enforces it,
+             *     so a mismatch is a rejected write, not a silently wrong link.
+             */
+            commitmentId?: string | null;
+        };
+        /**
+         * @description Who owes whom. Exactly two values, and there is no third case: either
+         *     the owner promised someone, or someone promised the owner.
+         *
+         *     `owed_to_me` has no task equivalent — there is nothing for the owner to
+         *     do, only someone to chase. That half is what most systems drop.
+         * @enum {string}
+         */
+        CommitmentDirection: "i_owe" | "owed_to_me";
+        /**
+         * @description There is no `overdue` here. Overdue is derived from `dueAt` at read
+         *     time, so it can never go stale in storage.
+         * @enum {string}
+         */
+        CommitmentStatus: "open" | "fulfilled" | "waived" | "dropped";
+        Commitment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            contextId: string;
+            /**
+             * Format: uuid
+             * @description The counterparty. Null means incomplete, not invalid.
+             */
+            personId?: string | null;
+            /**
+             * Format: uuid
+             * @description The signal carrying the promise, so the owner can read the exact
+             *     sentence. Null for a commitment recorded by hand — which the UI says
+             *     plainly rather than leaving the reader to assume evidence exists.
+             */
+            evidenceSignalId?: string | null;
+            direction: components["schemas"]["CommitmentDirection"];
+            what: string;
+            status: components["schemas"]["CommitmentStatus"];
+            /** Format: date-time */
+            promisedAt: string;
+            /** Format: date-time */
+            dueAt?: string | null;
+            /**
+             * Format: date-time
+             * @description Present exactly when status is not `open`.
+             */
+            resolvedAt?: string | null;
+            /**
+             * @description Whether the owner has agreed this promise is real. False for a fresh
+             *     extraction, and false is what holds reminders back until precision
+             *     has been measured. True for anything recorded by hand.
+             */
+            isConfirmed: boolean;
+            /**
+             * @description Derived from `dueAt` at read time, never stored. Computed by the
+             *     server so that "overdue" does not depend on the clock or timezone of
+             *     whichever browser is asking.
+             */
+            isOverdue: boolean;
+            /**
+             * Format: int32
+             * @description Null when there is no due date.
+             */
+            daysOverdue?: number | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /**
+         * @description A promise the owner records by hand — most often one made on a phone
+         *     call, which leaves no signal to extract from.
+         */
+        CreateCommitmentRequest: {
+            /** Format: uuid */
+            contextId: string;
+            direction: components["schemas"]["CommitmentDirection"];
+            /**
+             * @description The promise in the owner's own words. minLength mirrors
+             *     `commitments_what_not_blank`. A commitment is one sentence — if it
+             *     needs more, it is several commitments.
+             * @example Gửi báo giá thiết bị
+             */
+            what: string;
+            /**
+             * Format: uuid
+             * @description The counterparty. Nullable so that recording a promise never blocks
+             *     on creating a person first: the minute a call ends is the minute it
+             *     gets forgotten. A commitment without one is incomplete rather than
+             *     invalid, and the board surfaces it as something to fill in.
+             */
+            personId?: string | null;
+            /**
+             * Format: date-time
+             * @description When the promise was actually made, UTC. Defaults to now. Sent
+             *     explicitly when recording something from earlier — a call on Monday
+             *     entered on Wednesday is not a promise made on Wednesday.
+             */
+            promisedAt?: string | null;
+            /** Format: date-time */
+            dueAt?: string | null;
+        };
     };
     responses: {
         /** @description The request failed. */
@@ -562,7 +856,11 @@ export interface operations {
                     "application/json": components["schemas"]["CurrentSession"];
                 };
             };
-            /** @description An owner already exists. */
+            /**
+             * @description That email is already registered. Reported from the unique
+             *     constraint rather than a prior lookup, so two simultaneous
+             *     registrations cannot both pass a check and then collide.
+             */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -917,6 +1215,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SignalList"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaskRequest"];
+            };
+        };
+        responses: {
+            /**
+             * @description The task as stored, including every value the server decided. The
+             *     query underneath is `INSERT ... RETURNING *`, so the whole row costs
+             *     no extra round trip and spares the client a follow-up `GET`.
+             */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            /**
+             * @description No such context, or one belonging to someone else. The two are
+             *     reported identically: a context the owner cannot see does not exist.
+             */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /**
+             * @description A rule the schema could not express on its own — a parent task or
+             *     commitment in a different context, most often. Cross-context links
+             *     are refused by a composite foreign key in the database, so this is
+             *     a rejected write rather than a silently wrong row.
+             */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createCommitment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCommitmentRequest"];
+            };
+        };
+        responses: {
+            /** @description The commitment as stored. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Commitment"];
+                };
+            };
+            /** @description No such context or person, or one belonging to someone else. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A person or context that does not line up with the other. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
             default: components["responses"]["Error"];

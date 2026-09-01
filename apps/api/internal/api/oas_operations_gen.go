@@ -7,6 +7,8 @@ type OperationName = string
 
 const (
 	CompleteGoogleSignInOperation OperationName = "CompleteGoogleSignIn"
+	CreateCommitmentOperation     OperationName = "CreateCommitment"
+	CreateTaskOperation           OperationName = "CreateTask"
 	GetContextOperation           OperationName = "GetContext"
 	GetCurrentSessionOperation    OperationName = "GetCurrentSession"
 	ListAccountsOperation         OperationName = "ListAccounts"

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -18,6 +19,12 @@ import (
 )
 
 const (
+	// googleCallbackPath is the route this server actually serves, taken from
+	// docs/api/openapi.yaml. GOOGLE_REDIRECT_URL has to end here and be
+	// registered at Google identically, or the consent screen returns
+	// redirect_uri_mismatch - an error that names nothing in this codebase.
+	googleCallbackPath = "/api/v1/auth/google/callback"
+
 	// oauthCookieName holds the state, nonce and return path for one sign-in
 	// attempt.
 	oauthCookieName = "warp_oauth"
@@ -229,4 +236,53 @@ func withQuery(path, key, value string) string {
 	q.Set(key, value)
 	u.RawQuery = q.Encode()
 	return u.String()
+}
+
+// warnIfRedirectMismatched reports a GOOGLE_REDIRECT_URL that will not work.
+//
+// Two things can be wrong, and each fails somewhere other than here:
+//
+//   - The path does not reach this server's callback, which fails at Google
+//     with redirect_uri_mismatch.
+//   - The origin is not the one the browser uses, which fails *after* a
+//     successful sign-in: the cookie is set, the redirect issued, and the user
+//     lands on the API - which serves no pages - with a valid session they
+//     cannot see. That one looks like a broken login and is not.
+//
+// Warnings rather than refusals: a deployment may sit behind a proxy that
+// rewrites either, and being wrong about that should not stop the server. But
+// saying nothing costs an afternoon.
+func warnIfRedirectMismatched(logger *slog.Logger, redirectURL, webBaseURL string) {
+	if redirectURL == "" {
+		return
+	}
+
+	u, err := url.Parse(redirectURL)
+	if err != nil {
+		logger.Warn("GOOGLE_REDIRECT_URL is not a valid URL",
+			slog.String("value", redirectURL),
+			slog.String("error", err.Error()))
+		return
+	}
+
+	if u.Path != googleCallbackPath {
+		logger.Warn("GOOGLE_REDIRECT_URL does not reach this server's callback; "+
+			"Google will answer redirect_uri_mismatch",
+			slog.String("configured", u.Path),
+			slog.String("expected", googleCallbackPath))
+	}
+
+	web, err := url.Parse(webBaseURL)
+	if err != nil || web.Host == "" {
+		return
+	}
+
+	if u.Host != web.Host {
+		logger.Warn("GOOGLE_REDIRECT_URL does not come back through the web app; "+
+			"sign-in will succeed and then land on the API, which serves no pages",
+			slog.String("configured", u.Scheme+"://"+u.Host),
+			slog.String("expected", web.Scheme+"://"+web.Host),
+			slog.String("fix", "set GOOGLE_REDIRECT_URL to "+strings.TrimSuffix(webBaseURL, "/")+googleCallbackPath+
+				" and register the same value in the Google console"))
+	}
 }

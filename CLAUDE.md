@@ -53,9 +53,13 @@ even when it is "just a small addition", and do not treat a table's existence as
 
 ## Connectors
 
-- **Never write code against an unofficial or undocumented API.** Zalo personal, Facebook personal
-  messages, and Instagram personal are permanently out of scope — account-ban risk, not a
-  preference. Do not propose workarounds, scrapers, or browser automation for them.
+- **Prefer official APIs, and never reach for an unofficial one on your own initiative.**
+  Instagram personal stays out of scope. Zalo personal and Facebook personal messages were
+  reinstated by the owner on 2026-09-01, against the standing advice recorded here: both
+  carry the `unofficial` reliability tier, both state the ban risk and the silent-breakage
+  risk on their connector card, and connecting either requires an explicit acknowledgement.
+  Do not extend that decision to another source, and do not build a scraper or a browser
+  automation for anything not already on that list.
 - Every context must remain usable with `manual` sources alone. A dead connector degrades the
   system; it never breaks it.
 - `accounts.reliability` must be visible wherever data derived from that account is shown. A report

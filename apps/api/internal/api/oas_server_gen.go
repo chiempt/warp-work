@@ -22,6 +22,46 @@ type Handler interface {
 	//
 	// GET /api/v1/auth/google/callback
 	CompleteGoogleSignIn(ctx context.Context, params CompleteGoogleSignInParams) (CompleteGoogleSignInRes, error)
+	// CreateCommitment implements createCommitment operation.
+	//
+	// Most hand-recorded commitments come from a phone call, which leaves no signal at all. That is the
+	// case this endpoint exists for.
+	//
+	// `evidenceSignalId` is absent, and this is the sharpest instance of that rule anywhere in the API. A
+	// commitment is worth what its evidence is worth: the owner clicks it and reads the exact sentence
+	// that created it. A client able to set that field could point a promise it invented at somebody's
+	// email — the trail would not merely be thin, it would be false.
+	//
+	// `isConfirmed` is absent for a different reason: the server sets it `true` here. That column exists
+	// to mark what a model guessed, and holds back reminders until the owner agrees. A promise the owner
+	// just typed is confirmed by the act of typing it. Extraction takes the other path and writes `false`.
+	//
+	// As with tasks, `id`, `userId` and `status` are the server's. `status` starts `open`, and
+	// `resolvedAt` is a consequence of leaving that state rather than something a client states — the
+	// two are checked against each other by `commitments_resolution_consistent`.
+	//
+	// POST /api/v1/commitments
+	CreateCommitment(ctx context.Context, req *CreateCommitmentRequest) (CreateCommitmentRes, error)
+	// CreateTask implements createTask operation.
+	//
+	// The manual path in, and a first-class one: a task decided in a meeting leaves no signal to extract
+	// from, and losing it is worse than recording it without a source.
+	//
+	// What manual entry never does is pretend to be derived. `sourceSignalId` is absent from the request
+	// on purpose — extraction sets it through the service, and a hand-written task that could claim an
+	// email as its origin would make the audit trail lie.
+	//
+	// Three more fields are the server's to decide, not the client's: `id` is a UUIDv7 generated before
+	// insert, `userId` comes from the session cookie and never from the body, and `status` always starts
+	// `open`. Creating a task that is already done is a create followed by a status change —
+	// `completedAt` and `blockedReason` are consequences of that status, which is why they are set by the
+	// status transition and not stated here.
+	//
+	// `owner` is absent until Phase 3. The column accepts `agent`, but no agent runs yet, so a task
+	// assigned to one would sit in a queue nothing drains.
+	//
+	// POST /api/v1/tasks
+	CreateTask(ctx context.Context, req *CreateTaskRequest) (CreateTaskRes, error)
 	// GetContext implements getContext operation.
 	//
 	// Get one context.

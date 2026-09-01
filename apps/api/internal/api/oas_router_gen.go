@@ -11,10 +11,16 @@ import (
 )
 
 var (
-	rn13AllowedHeaders = map[string]string{
+	rn16AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
-	rn14AllowedHeaders = map[string]string{
+	rn17AllowedHeaders = map[string]string{
+		"POST": "Content-Type",
+	}
+	rn3AllowedHeaders = map[string]string{
+		"POST": "Content-Type",
+	}
+	rn4AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
 )
@@ -199,7 +205,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn13AllowedHeaders,
+									allowedHeaders: rn16AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -286,7 +292,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn14AllowedHeaders,
+									allowedHeaders: rn17AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -389,54 +395,55 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				}
 
-			case 'c': // Prefix: "contexts"
+			case 'c': // Prefix: "co"
 
-				if l := len("contexts"); len(elem) >= l && elem[0:l] == "contexts" {
+				if l := len("co"); len(elem) >= l && elem[0:l] == "co" {
 					elem = elem[l:]
 				} else {
 					break
 				}
 
 				if len(elem) == 0 {
-					switch r.Method {
-					case "GET":
-						s.handleListContextsRequest([0]string{}, elemIsEscaped, w, r)
-					default:
-						s.notAllowed(w, r, notAllowedParams{
-							allowedMethods: "GET",
-							allowedHeaders: nil,
-							acceptPost:     "",
-							acceptPatch:    "",
-						})
-					}
-
-					return
+					break
 				}
 				switch elem[0] {
-				case '/': // Prefix: "/"
+				case 'm': // Prefix: "mmitments"
 
-					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+					if l := len("mmitments"); len(elem) >= l && elem[0:l] == "mmitments" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
-					// Param: "contextId"
-					// Leaf parameter, slashes are prohibited
-					idx := strings.IndexByte(elem, '/')
-					if idx >= 0 {
-						break
-					}
-					args[0] = elem
-					elem = ""
-
 					if len(elem) == 0 {
 						// Leaf node.
 						switch r.Method {
+						case "POST":
+							s.handleCreateCommitmentRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "POST",
+								allowedHeaders: rn3AllowedHeaders,
+								acceptPost:     "application/json",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
+				case 'n': // Prefix: "ntexts"
+
+					if l := len("ntexts"); len(elem) >= l && elem[0:l] == "ntexts" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						switch r.Method {
 						case "GET":
-							s.handleGetContextRequest([1]string{
-								args[0],
-							}, elemIsEscaped, w, r)
+							s.handleListContextsRequest([0]string{}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "GET",
@@ -447,6 +454,44 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						}
 
 						return
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/"
+
+						if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						// Param: "contextId"
+						// Leaf parameter, slashes are prohibited
+						idx := strings.IndexByte(elem, '/')
+						if idx >= 0 {
+							break
+						}
+						args[0] = elem
+						elem = ""
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleGetContextRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: nil,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
 					}
 
 				}
@@ -469,6 +514,31 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							allowedMethods: "GET",
 							allowedHeaders: nil,
 							acceptPost:     "",
+							acceptPatch:    "",
+						})
+					}
+
+					return
+				}
+
+			case 't': // Prefix: "tasks"
+
+				if l := len("tasks"); len(elem) >= l && elem[0:l] == "tasks" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					// Leaf node.
+					switch r.Method {
+					case "POST":
+						s.handleCreateTaskRequest([0]string{}, elemIsEscaped, w, r)
+					default:
+						s.notAllowed(w, r, notAllowedParams{
+							allowedMethods: "POST",
+							allowedHeaders: rn4AllowedHeaders,
+							acceptPost:     "application/json",
 							acceptPatch:    "",
 						})
 					}
@@ -898,62 +968,101 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 
 				}
 
-			case 'c': // Prefix: "contexts"
+			case 'c': // Prefix: "co"
 
-				if l := len("contexts"); len(elem) >= l && elem[0:l] == "contexts" {
+				if l := len("co"); len(elem) >= l && elem[0:l] == "co" {
 					elem = elem[l:]
 				} else {
 					break
 				}
 
 				if len(elem) == 0 {
-					switch method {
-					case "GET":
-						r.name = ListContextsOperation
-						r.summary = "List contexts"
-						r.operationID = "listContexts"
-						r.operationGroup = ""
-						r.pathPattern = "/api/v1/contexts"
-						r.args = args
-						r.count = 0
-						return r, true
-					default:
-						return
-					}
+					break
 				}
 				switch elem[0] {
-				case '/': // Prefix: "/"
+				case 'm': // Prefix: "mmitments"
 
-					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+					if l := len("mmitments"); len(elem) >= l && elem[0:l] == "mmitments" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
-					// Param: "contextId"
-					// Leaf parameter, slashes are prohibited
-					idx := strings.IndexByte(elem, '/')
-					if idx >= 0 {
-						break
-					}
-					args[0] = elem
-					elem = ""
-
 					if len(elem) == 0 {
 						// Leaf node.
 						switch method {
-						case "GET":
-							r.name = GetContextOperation
-							r.summary = "Get one context"
-							r.operationID = "getContext"
+						case "POST":
+							r.name = CreateCommitmentOperation
+							r.summary = "Record a promise by hand"
+							r.operationID = "createCommitment"
 							r.operationGroup = ""
-							r.pathPattern = "/api/v1/contexts/{contextId}"
+							r.pathPattern = "/api/v1/commitments"
 							r.args = args
-							r.count = 1
+							r.count = 0
 							return r, true
 						default:
 							return
 						}
+					}
+
+				case 'n': // Prefix: "ntexts"
+
+					if l := len("ntexts"); len(elem) >= l && elem[0:l] == "ntexts" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						switch method {
+						case "GET":
+							r.name = ListContextsOperation
+							r.summary = "List contexts"
+							r.operationID = "listContexts"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/contexts"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/"
+
+						if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						// Param: "contextId"
+						// Leaf parameter, slashes are prohibited
+						idx := strings.IndexByte(elem, '/')
+						if idx >= 0 {
+							break
+						}
+						args[0] = elem
+						elem = ""
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = GetContextOperation
+								r.summary = "Get one context"
+								r.operationID = "getContext"
+								r.operationGroup = ""
+								r.pathPattern = "/api/v1/contexts/{contextId}"
+								r.args = args
+								r.count = 1
+								return r, true
+							default:
+								return
+							}
+						}
+
 					}
 
 				}
@@ -975,6 +1084,31 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.operationID = "listSignals"
 						r.operationGroup = ""
 						r.pathPattern = "/api/v1/signals"
+						r.args = args
+						r.count = 0
+						return r, true
+					default:
+						return
+					}
+				}
+
+			case 't': // Prefix: "tasks"
+
+				if l := len("tasks"); len(elem) >= l && elem[0:l] == "tasks" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					// Leaf node.
+					switch method {
+					case "POST":
+						r.name = CreateTaskOperation
+						r.summary = "Record a task by hand"
+						r.operationID = "createTask"
+						r.operationGroup = ""
+						r.pathPattern = "/api/v1/tasks"
 						r.args = args
 						r.count = 0
 						return r, true

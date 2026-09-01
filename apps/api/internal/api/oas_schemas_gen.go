@@ -277,6 +277,292 @@ func (s *AuthProviderKind) UnmarshalText(data []byte) error {
 	}
 }
 
+// Ref: #/components/schemas/Commitment
+type Commitment struct {
+	ID        uuid.UUID `json:"id"`
+	ContextId uuid.UUID `json:"contextId"`
+	// The counterparty. Null means incomplete, not invalid.
+	PersonId OptNilUUID `json:"personId"`
+	// The signal carrying the promise, so the owner can read the exact sentence. Null for a commitment
+	// recorded by hand — which the UI says plainly rather than leaving the reader to assume evidence
+	// exists.
+	EvidenceSignalId OptNilUUID          `json:"evidenceSignalId"`
+	Direction        CommitmentDirection `json:"direction"`
+	What             string              `json:"what"`
+	Status           CommitmentStatus    `json:"status"`
+	PromisedAt       time.Time           `json:"promisedAt"`
+	DueAt            OptNilDateTime      `json:"dueAt"`
+	// Present exactly when status is not `open`.
+	ResolvedAt OptNilDateTime `json:"resolvedAt"`
+	// Whether the owner has agreed this promise is real. False for a fresh extraction, and false is what
+	// holds reminders back until precision has been measured. True for anything recorded by hand.
+	IsConfirmed bool `json:"isConfirmed"`
+	// Derived from `dueAt` at read time, never stored. Computed by the server so that "overdue" does not
+	// depend on the clock or timezone of whichever browser is asking.
+	IsOverdue bool `json:"isOverdue"`
+	// Null when there is no due date.
+	DaysOverdue OptNilInt32 `json:"daysOverdue"`
+	CreatedAt   time.Time   `json:"createdAt"`
+	UpdatedAt   time.Time   `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *Commitment) GetID() uuid.UUID {
+	return s.ID
+}
+
+// GetContextId returns the value of ContextId.
+func (s *Commitment) GetContextId() uuid.UUID {
+	return s.ContextId
+}
+
+// GetPersonId returns the value of PersonId.
+func (s *Commitment) GetPersonId() OptNilUUID {
+	return s.PersonId
+}
+
+// GetEvidenceSignalId returns the value of EvidenceSignalId.
+func (s *Commitment) GetEvidenceSignalId() OptNilUUID {
+	return s.EvidenceSignalId
+}
+
+// GetDirection returns the value of Direction.
+func (s *Commitment) GetDirection() CommitmentDirection {
+	return s.Direction
+}
+
+// GetWhat returns the value of What.
+func (s *Commitment) GetWhat() string {
+	return s.What
+}
+
+// GetStatus returns the value of Status.
+func (s *Commitment) GetStatus() CommitmentStatus {
+	return s.Status
+}
+
+// GetPromisedAt returns the value of PromisedAt.
+func (s *Commitment) GetPromisedAt() time.Time {
+	return s.PromisedAt
+}
+
+// GetDueAt returns the value of DueAt.
+func (s *Commitment) GetDueAt() OptNilDateTime {
+	return s.DueAt
+}
+
+// GetResolvedAt returns the value of ResolvedAt.
+func (s *Commitment) GetResolvedAt() OptNilDateTime {
+	return s.ResolvedAt
+}
+
+// GetIsConfirmed returns the value of IsConfirmed.
+func (s *Commitment) GetIsConfirmed() bool {
+	return s.IsConfirmed
+}
+
+// GetIsOverdue returns the value of IsOverdue.
+func (s *Commitment) GetIsOverdue() bool {
+	return s.IsOverdue
+}
+
+// GetDaysOverdue returns the value of DaysOverdue.
+func (s *Commitment) GetDaysOverdue() OptNilInt32 {
+	return s.DaysOverdue
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *Commitment) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *Commitment) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *Commitment) SetID(val uuid.UUID) {
+	s.ID = val
+}
+
+// SetContextId sets the value of ContextId.
+func (s *Commitment) SetContextId(val uuid.UUID) {
+	s.ContextId = val
+}
+
+// SetPersonId sets the value of PersonId.
+func (s *Commitment) SetPersonId(val OptNilUUID) {
+	s.PersonId = val
+}
+
+// SetEvidenceSignalId sets the value of EvidenceSignalId.
+func (s *Commitment) SetEvidenceSignalId(val OptNilUUID) {
+	s.EvidenceSignalId = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *Commitment) SetDirection(val CommitmentDirection) {
+	s.Direction = val
+}
+
+// SetWhat sets the value of What.
+func (s *Commitment) SetWhat(val string) {
+	s.What = val
+}
+
+// SetStatus sets the value of Status.
+func (s *Commitment) SetStatus(val CommitmentStatus) {
+	s.Status = val
+}
+
+// SetPromisedAt sets the value of PromisedAt.
+func (s *Commitment) SetPromisedAt(val time.Time) {
+	s.PromisedAt = val
+}
+
+// SetDueAt sets the value of DueAt.
+func (s *Commitment) SetDueAt(val OptNilDateTime) {
+	s.DueAt = val
+}
+
+// SetResolvedAt sets the value of ResolvedAt.
+func (s *Commitment) SetResolvedAt(val OptNilDateTime) {
+	s.ResolvedAt = val
+}
+
+// SetIsConfirmed sets the value of IsConfirmed.
+func (s *Commitment) SetIsConfirmed(val bool) {
+	s.IsConfirmed = val
+}
+
+// SetIsOverdue sets the value of IsOverdue.
+func (s *Commitment) SetIsOverdue(val bool) {
+	s.IsOverdue = val
+}
+
+// SetDaysOverdue sets the value of DaysOverdue.
+func (s *Commitment) SetDaysOverdue(val OptNilInt32) {
+	s.DaysOverdue = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *Commitment) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *Commitment) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*Commitment) createCommitmentRes() {}
+
+// Who owes whom. Exactly two values, and there is no third case: either the owner promised someone, or
+// someone promised the owner.
+//
+// `owed_to_me` has no task equivalent — there is nothing for the owner to do, only someone to chase.
+// That half is what most systems drop.
+// Ref: #/components/schemas/CommitmentDirection
+type CommitmentDirection string
+
+const (
+	CommitmentDirectionIOwe     CommitmentDirection = "i_owe"
+	CommitmentDirectionOwedToMe CommitmentDirection = "owed_to_me"
+)
+
+// AllValues returns all CommitmentDirection values.
+func (CommitmentDirection) AllValues() []CommitmentDirection {
+	return []CommitmentDirection{
+		CommitmentDirectionIOwe,
+		CommitmentDirectionOwedToMe,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CommitmentDirection) MarshalText() ([]byte, error) {
+	switch s {
+	case CommitmentDirectionIOwe:
+		return []byte(s), nil
+	case CommitmentDirectionOwedToMe:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CommitmentDirection) UnmarshalText(data []byte) error {
+	switch CommitmentDirection(data) {
+	case CommitmentDirectionIOwe:
+		*s = CommitmentDirectionIOwe
+		return nil
+	case CommitmentDirectionOwedToMe:
+		*s = CommitmentDirectionOwedToMe
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// There is no `overdue` here. Overdue is derived from `dueAt` at read time, so it can never go stale
+// in storage.
+// Ref: #/components/schemas/CommitmentStatus
+type CommitmentStatus string
+
+const (
+	CommitmentStatusOpen      CommitmentStatus = "open"
+	CommitmentStatusFulfilled CommitmentStatus = "fulfilled"
+	CommitmentStatusWaived    CommitmentStatus = "waived"
+	CommitmentStatusDropped   CommitmentStatus = "dropped"
+)
+
+// AllValues returns all CommitmentStatus values.
+func (CommitmentStatus) AllValues() []CommitmentStatus {
+	return []CommitmentStatus{
+		CommitmentStatusOpen,
+		CommitmentStatusFulfilled,
+		CommitmentStatusWaived,
+		CommitmentStatusDropped,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CommitmentStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case CommitmentStatusOpen:
+		return []byte(s), nil
+	case CommitmentStatusFulfilled:
+		return []byte(s), nil
+	case CommitmentStatusWaived:
+		return []byte(s), nil
+	case CommitmentStatusDropped:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CommitmentStatus) UnmarshalText(data []byte) error {
+	switch CommitmentStatus(data) {
+	case CommitmentStatusOpen:
+		*s = CommitmentStatusOpen
+		return nil
+	case CommitmentStatusFulfilled:
+		*s = CommitmentStatusFulfilled
+		return nil
+	case CommitmentStatusWaived:
+		*s = CommitmentStatusWaived
+		return nil
+	case CommitmentStatusDropped:
+		*s = CommitmentStatusDropped
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // CompleteGoogleSignInFound is response for CompleteGoogleSignIn operation.
 type CompleteGoogleSignInFound struct {
 	Location  string
@@ -498,6 +784,207 @@ func (s *ContextList) GetItems() []Context {
 func (s *ContextList) SetItems(val []Context) {
 	s.Items = val
 }
+
+type CreateCommitmentNotFound ErrorEnvelope
+
+func (*CreateCommitmentNotFound) createCommitmentRes() {}
+
+// A promise the owner records by hand — most often one made on a phone call, which leaves no signal
+// to extract from.
+// Ref: #/components/schemas/CreateCommitmentRequest
+type CreateCommitmentRequest struct {
+	ContextId uuid.UUID           `json:"contextId"`
+	Direction CommitmentDirection `json:"direction"`
+	// The promise in the owner's own words. minLength mirrors `commitments_what_not_blank`. A commitment
+	// is one sentence — if it needs more, it is several commitments.
+	What string `json:"what"`
+	// The counterparty. Nullable so that recording a promise never blocks on creating a person first: the
+	// minute a call ends is the minute it gets forgotten. A commitment without one is incomplete rather
+	// than invalid, and the board surfaces it as something to fill in.
+	PersonId OptNilUUID `json:"personId"`
+	// When the promise was actually made, UTC. Defaults to now. Sent explicitly when recording something
+	// from earlier — a call on Monday entered on Wednesday is not a promise made on Wednesday.
+	PromisedAt OptNilDateTime `json:"promisedAt"`
+	DueAt      OptNilDateTime `json:"dueAt"`
+}
+
+// GetContextId returns the value of ContextId.
+func (s *CreateCommitmentRequest) GetContextId() uuid.UUID {
+	return s.ContextId
+}
+
+// GetDirection returns the value of Direction.
+func (s *CreateCommitmentRequest) GetDirection() CommitmentDirection {
+	return s.Direction
+}
+
+// GetWhat returns the value of What.
+func (s *CreateCommitmentRequest) GetWhat() string {
+	return s.What
+}
+
+// GetPersonId returns the value of PersonId.
+func (s *CreateCommitmentRequest) GetPersonId() OptNilUUID {
+	return s.PersonId
+}
+
+// GetPromisedAt returns the value of PromisedAt.
+func (s *CreateCommitmentRequest) GetPromisedAt() OptNilDateTime {
+	return s.PromisedAt
+}
+
+// GetDueAt returns the value of DueAt.
+func (s *CreateCommitmentRequest) GetDueAt() OptNilDateTime {
+	return s.DueAt
+}
+
+// SetContextId sets the value of ContextId.
+func (s *CreateCommitmentRequest) SetContextId(val uuid.UUID) {
+	s.ContextId = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *CreateCommitmentRequest) SetDirection(val CommitmentDirection) {
+	s.Direction = val
+}
+
+// SetWhat sets the value of What.
+func (s *CreateCommitmentRequest) SetWhat(val string) {
+	s.What = val
+}
+
+// SetPersonId sets the value of PersonId.
+func (s *CreateCommitmentRequest) SetPersonId(val OptNilUUID) {
+	s.PersonId = val
+}
+
+// SetPromisedAt sets the value of PromisedAt.
+func (s *CreateCommitmentRequest) SetPromisedAt(val OptNilDateTime) {
+	s.PromisedAt = val
+}
+
+// SetDueAt sets the value of DueAt.
+func (s *CreateCommitmentRequest) SetDueAt(val OptNilDateTime) {
+	s.DueAt = val
+}
+
+type CreateCommitmentUnprocessableEntity ErrorEnvelope
+
+func (*CreateCommitmentUnprocessableEntity) createCommitmentRes() {}
+
+type CreateTaskNotFound ErrorEnvelope
+
+func (*CreateTaskNotFound) createTaskRes() {}
+
+// A task the owner writes by hand. Every field the server decides for itself is absent rather than
+// optional — see the operation description.
+// Ref: #/components/schemas/CreateTaskRequest
+type CreateTaskRequest struct {
+	// The one context this task belongs to. Work spanning two contexts is two tasks, not one task in two
+	// places.
+	ContextId uuid.UUID `json:"contextId"`
+	// MinLength mirrors `tasks_title_not_blank`. maxLength is stricter than the column, which is `text`
+	// — a 500-character title is a paste accident, and refusing it here beats storing it.
+	Title  string       `json:"title"`
+	Detail OptNilString `json:"detail"`
+	// 1 is most urgent. Range mirrors `tasks_priority_range`. The column also defaults to 3; the server
+	// resolves the value and always writes it explicitly, so the two defaults cannot drift apart
+	// unnoticed.
+	Priority OptInt32 `json:"priority"`
+	// UTC. Conversion to Asia/Ho_Chi_Minh happens in the browser, never in a query and never here.
+	DueAt OptNilDateTime `json:"dueAt"`
+	// Mirrors `tasks_estimate_positive` — zero is not an estimate.
+	EstimatedMinutes OptNilInt32 `json:"estimatedMinutes"`
+	// Must be in the same context.
+	ParentTaskId OptNilUUID `json:"parentTaskId"`
+	// The promise this task discharges, if any. Most tasks have none. Must be in the same context — a
+	// composite foreign key enforces it, so a mismatch is a rejected write, not a silently wrong link.
+	CommitmentId OptNilUUID `json:"commitmentId"`
+}
+
+// GetContextId returns the value of ContextId.
+func (s *CreateTaskRequest) GetContextId() uuid.UUID {
+	return s.ContextId
+}
+
+// GetTitle returns the value of Title.
+func (s *CreateTaskRequest) GetTitle() string {
+	return s.Title
+}
+
+// GetDetail returns the value of Detail.
+func (s *CreateTaskRequest) GetDetail() OptNilString {
+	return s.Detail
+}
+
+// GetPriority returns the value of Priority.
+func (s *CreateTaskRequest) GetPriority() OptInt32 {
+	return s.Priority
+}
+
+// GetDueAt returns the value of DueAt.
+func (s *CreateTaskRequest) GetDueAt() OptNilDateTime {
+	return s.DueAt
+}
+
+// GetEstimatedMinutes returns the value of EstimatedMinutes.
+func (s *CreateTaskRequest) GetEstimatedMinutes() OptNilInt32 {
+	return s.EstimatedMinutes
+}
+
+// GetParentTaskId returns the value of ParentTaskId.
+func (s *CreateTaskRequest) GetParentTaskId() OptNilUUID {
+	return s.ParentTaskId
+}
+
+// GetCommitmentId returns the value of CommitmentId.
+func (s *CreateTaskRequest) GetCommitmentId() OptNilUUID {
+	return s.CommitmentId
+}
+
+// SetContextId sets the value of ContextId.
+func (s *CreateTaskRequest) SetContextId(val uuid.UUID) {
+	s.ContextId = val
+}
+
+// SetTitle sets the value of Title.
+func (s *CreateTaskRequest) SetTitle(val string) {
+	s.Title = val
+}
+
+// SetDetail sets the value of Detail.
+func (s *CreateTaskRequest) SetDetail(val OptNilString) {
+	s.Detail = val
+}
+
+// SetPriority sets the value of Priority.
+func (s *CreateTaskRequest) SetPriority(val OptInt32) {
+	s.Priority = val
+}
+
+// SetDueAt sets the value of DueAt.
+func (s *CreateTaskRequest) SetDueAt(val OptNilDateTime) {
+	s.DueAt = val
+}
+
+// SetEstimatedMinutes sets the value of EstimatedMinutes.
+func (s *CreateTaskRequest) SetEstimatedMinutes(val OptNilInt32) {
+	s.EstimatedMinutes = val
+}
+
+// SetParentTaskId sets the value of ParentTaskId.
+func (s *CreateTaskRequest) SetParentTaskId(val OptNilUUID) {
+	s.ParentTaskId = val
+}
+
+// SetCommitmentId sets the value of CommitmentId.
+func (s *CreateTaskRequest) SetCommitmentId(val OptNilUUID) {
+	s.CommitmentId = val
+}
+
+type CreateTaskUnprocessableEntity ErrorEnvelope
+
+func (*CreateTaskUnprocessableEntity) createTaskRes() {}
 
 // Ref: #/components/schemas/CurrentSession
 type CurrentSession struct {
@@ -1233,6 +1720,74 @@ func (o OptNilDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInt32 returns new OptNilInt32 with value set to v.
+func NewOptNilInt32(v int32) OptNilInt32 {
+	return OptNilInt32{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInt32 is optional nullable int32.
+type OptNilInt32 struct {
+	Value int32
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInt32 was set.
+func (o OptNilInt32) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInt32) Reset() {
+	var v int32
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInt32) SetTo(v int32) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInt32) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInt32) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v int32
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilInt32) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInt32) Get() (v int32, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInt32) Or(d int32) int32 {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -2003,6 +2558,307 @@ func (s *StartGoogleSignInFound) SetLocation(val string) {
 // SetSetCookie sets the value of SetCookie.
 func (s *StartGoogleSignInFound) SetSetCookie(val OptString) {
 	s.SetCookie = val
+}
+
+// Ref: #/components/schemas/Task
+type Task struct {
+	ID uuid.UUID `json:"id"`
+	// The one context this task belongs to. Work spanning two contexts is two tasks — unlike a signal,
+	// which can legitimately land in both.
+	ContextId uuid.UUID `json:"contextId"`
+	// The signal extraction derived this from. Null for a task written by hand, and that null is the
+	// honest answer — it is what tells the owner nothing external vouches for this row.
+	SourceSignalId OptNilUUID `json:"sourceSignalId"`
+	ParentTaskId   OptNilUUID `json:"parentTaskId"`
+	// The promise this task discharges, if any. Null for most tasks: work the owner set themselves has no
+	// counterparty waiting on it.
+	CommitmentId OptNilUUID   `json:"commitmentId"`
+	Title        string       `json:"title"`
+	Detail       OptNilString `json:"detail"`
+	Status       TaskStatus   `json:"status"`
+	Owner        TaskOwner    `json:"owner"`
+	// 1 is most urgent.
+	Priority int32 `json:"priority"`
+	// UTC. The browser converts to Asia/Ho_Chi_Minh, nothing else does.
+	DueAt            OptNilDateTime `json:"dueAt"`
+	EstimatedMinutes OptNilInt32    `json:"estimatedMinutes"`
+	// Present exactly when status is `blocked`.
+	BlockedReason OptNilString `json:"blockedReason"`
+	CreatedAt     time.Time    `json:"createdAt"`
+	UpdatedAt     time.Time    `json:"updatedAt"`
+	// Present exactly when status is `done`.
+	CompletedAt OptNilDateTime `json:"completedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *Task) GetID() uuid.UUID {
+	return s.ID
+}
+
+// GetContextId returns the value of ContextId.
+func (s *Task) GetContextId() uuid.UUID {
+	return s.ContextId
+}
+
+// GetSourceSignalId returns the value of SourceSignalId.
+func (s *Task) GetSourceSignalId() OptNilUUID {
+	return s.SourceSignalId
+}
+
+// GetParentTaskId returns the value of ParentTaskId.
+func (s *Task) GetParentTaskId() OptNilUUID {
+	return s.ParentTaskId
+}
+
+// GetCommitmentId returns the value of CommitmentId.
+func (s *Task) GetCommitmentId() OptNilUUID {
+	return s.CommitmentId
+}
+
+// GetTitle returns the value of Title.
+func (s *Task) GetTitle() string {
+	return s.Title
+}
+
+// GetDetail returns the value of Detail.
+func (s *Task) GetDetail() OptNilString {
+	return s.Detail
+}
+
+// GetStatus returns the value of Status.
+func (s *Task) GetStatus() TaskStatus {
+	return s.Status
+}
+
+// GetOwner returns the value of Owner.
+func (s *Task) GetOwner() TaskOwner {
+	return s.Owner
+}
+
+// GetPriority returns the value of Priority.
+func (s *Task) GetPriority() int32 {
+	return s.Priority
+}
+
+// GetDueAt returns the value of DueAt.
+func (s *Task) GetDueAt() OptNilDateTime {
+	return s.DueAt
+}
+
+// GetEstimatedMinutes returns the value of EstimatedMinutes.
+func (s *Task) GetEstimatedMinutes() OptNilInt32 {
+	return s.EstimatedMinutes
+}
+
+// GetBlockedReason returns the value of BlockedReason.
+func (s *Task) GetBlockedReason() OptNilString {
+	return s.BlockedReason
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *Task) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *Task) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// GetCompletedAt returns the value of CompletedAt.
+func (s *Task) GetCompletedAt() OptNilDateTime {
+	return s.CompletedAt
+}
+
+// SetID sets the value of ID.
+func (s *Task) SetID(val uuid.UUID) {
+	s.ID = val
+}
+
+// SetContextId sets the value of ContextId.
+func (s *Task) SetContextId(val uuid.UUID) {
+	s.ContextId = val
+}
+
+// SetSourceSignalId sets the value of SourceSignalId.
+func (s *Task) SetSourceSignalId(val OptNilUUID) {
+	s.SourceSignalId = val
+}
+
+// SetParentTaskId sets the value of ParentTaskId.
+func (s *Task) SetParentTaskId(val OptNilUUID) {
+	s.ParentTaskId = val
+}
+
+// SetCommitmentId sets the value of CommitmentId.
+func (s *Task) SetCommitmentId(val OptNilUUID) {
+	s.CommitmentId = val
+}
+
+// SetTitle sets the value of Title.
+func (s *Task) SetTitle(val string) {
+	s.Title = val
+}
+
+// SetDetail sets the value of Detail.
+func (s *Task) SetDetail(val OptNilString) {
+	s.Detail = val
+}
+
+// SetStatus sets the value of Status.
+func (s *Task) SetStatus(val TaskStatus) {
+	s.Status = val
+}
+
+// SetOwner sets the value of Owner.
+func (s *Task) SetOwner(val TaskOwner) {
+	s.Owner = val
+}
+
+// SetPriority sets the value of Priority.
+func (s *Task) SetPriority(val int32) {
+	s.Priority = val
+}
+
+// SetDueAt sets the value of DueAt.
+func (s *Task) SetDueAt(val OptNilDateTime) {
+	s.DueAt = val
+}
+
+// SetEstimatedMinutes sets the value of EstimatedMinutes.
+func (s *Task) SetEstimatedMinutes(val OptNilInt32) {
+	s.EstimatedMinutes = val
+}
+
+// SetBlockedReason sets the value of BlockedReason.
+func (s *Task) SetBlockedReason(val OptNilString) {
+	s.BlockedReason = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *Task) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *Task) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// SetCompletedAt sets the value of CompletedAt.
+func (s *Task) SetCompletedAt(val OptNilDateTime) {
+	s.CompletedAt = val
+}
+
+func (*Task) createTaskRes() {}
+
+// Who is expected to do this. `agent` is not reachable before Phase 3; it is described here because
+// the column exists, not because it works.
+// Ref: #/components/schemas/TaskOwner
+type TaskOwner string
+
+const (
+	TaskOwnerMe    TaskOwner = "me"
+	TaskOwnerAgent TaskOwner = "agent"
+)
+
+// AllValues returns all TaskOwner values.
+func (TaskOwner) AllValues() []TaskOwner {
+	return []TaskOwner{
+		TaskOwnerMe,
+		TaskOwnerAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s TaskOwner) MarshalText() ([]byte, error) {
+	switch s {
+	case TaskOwnerMe:
+		return []byte(s), nil
+	case TaskOwnerAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *TaskOwner) UnmarshalText(data []byte) error {
+	switch TaskOwner(data) {
+	case TaskOwnerMe:
+		*s = TaskOwnerMe
+		return nil
+	case TaskOwnerAgent:
+		*s = TaskOwnerAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// `blocked` carries a reason and `done` carries a completion time — the database checks both, so a
+// status is never on its own.
+// Ref: #/components/schemas/TaskStatus
+type TaskStatus string
+
+const (
+	TaskStatusOpen       TaskStatus = "open"
+	TaskStatusInProgress TaskStatus = "in_progress"
+	TaskStatusBlocked    TaskStatus = "blocked"
+	TaskStatusDone       TaskStatus = "done"
+	TaskStatusDropped    TaskStatus = "dropped"
+)
+
+// AllValues returns all TaskStatus values.
+func (TaskStatus) AllValues() []TaskStatus {
+	return []TaskStatus{
+		TaskStatusOpen,
+		TaskStatusInProgress,
+		TaskStatusBlocked,
+		TaskStatusDone,
+		TaskStatusDropped,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s TaskStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case TaskStatusOpen:
+		return []byte(s), nil
+	case TaskStatusInProgress:
+		return []byte(s), nil
+	case TaskStatusBlocked:
+		return []byte(s), nil
+	case TaskStatusDone:
+		return []byte(s), nil
+	case TaskStatusDropped:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *TaskStatus) UnmarshalText(data []byte) error {
+	switch TaskStatus(data) {
+	case TaskStatusOpen:
+		*s = TaskStatusOpen
+		return nil
+	case TaskStatusInProgress:
+		*s = TaskStatusInProgress
+		return nil
+	case TaskStatusBlocked:
+		*s = TaskStatusBlocked
+		return nil
+	case TaskStatusDone:
+		*s = TaskStatusDone
+		return nil
+	case TaskStatusDropped:
+		*s = TaskStatusDropped
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 type UnlinkAuthProviderConflict ErrorEnvelope

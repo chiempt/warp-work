@@ -1580,6 +1580,7 @@ type Task struct {
 	CreatedAt        pgtype.Timestamptz
 	UpdatedAt        pgtype.Timestamptz
 	CompletedAt      pgtype.Timestamptz
+	CommitmentID     *uuid.UUID
 }
 
 type User struct {

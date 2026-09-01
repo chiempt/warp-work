@@ -17,6 +17,22 @@ export type AccountProvider =
   | "zalo_oa"
   | "facebook_page"
   | "instagram_business"
+  /**
+   * TODO(telegram-enum): not yet a value of the `account_provider` enum in
+   * db/migrations/00006_accounts.sql. Landing this for real needs its own
+   * `-- +goose NO TRANSACTION` migration adding the value — an enum value can be
+   * added but never removed, so it is a deliberate one-way step, not a side effect
+   * of a frontend change.
+   */
+  | "telegram"
+  /**
+   * Unofficial routes, enabled by the owner (context doc §4). Neither vendor
+   * publishes an API for a personal account, so both carry the `unofficial`
+   * reliability tier and everything derived from them is marked as possibly
+   * incomplete wherever it is shown.
+   */
+  | "zalo_personal"
+  | "facebook_personal"
   | "manual"
 
 export type AccountReliability = "official" | "unofficial" | "manual"

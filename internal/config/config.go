@@ -31,6 +31,7 @@ type Config struct {
 	Redis       Redis
 	Claude      Claude
 	Google      Google
+	Web         Web
 	Credentials Credentials
 }
 
@@ -75,6 +76,13 @@ type Claude struct {
 }
 
 func (c Claude) Enabled() bool { return c.APIKey != "" }
+
+// Web is where the browser reaches the application. apps/web proxies /api/v1
+// through to this service, so a sign-in has to come back through that origin —
+// otherwise the redirect after it lands on the API, which serves no pages.
+type Web struct {
+	BaseURL string
+}
 
 // Google covers the Phase 1 connectors: Gmail, Calendar, Drive. Optional until
 // the OAuth flow exists.
@@ -140,6 +148,9 @@ func Load() (Config, error) {
 			ClientID:     l.optional("GOOGLE_CLIENT_ID"),
 			ClientSecret: l.optional("GOOGLE_CLIENT_SECRET"),
 			RedirectURL:  l.str("GOOGLE_REDIRECT_URL", "http://localhost:8080/api/v1/oauth/google/callback"),
+		},
+		Web: Web{
+			BaseURL: l.str("WEB_BASE_URL", "http://localhost:3000"),
 		},
 		Credentials: Credentials{
 			EncryptionKey: l.key("CREDENTIALS_ENCRYPTION_KEY", 32),

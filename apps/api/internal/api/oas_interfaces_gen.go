@@ -5,6 +5,14 @@ type CompleteGoogleSignInRes interface {
 	completeGoogleSignInRes()
 }
 
+type CreateCommitmentRes interface {
+	createCommitmentRes()
+}
+
+type CreateTaskRes interface {
+	createTaskRes()
+}
+
 type GetContextRes interface {
 	getContextRes()
 }

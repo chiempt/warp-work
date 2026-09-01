@@ -54,6 +54,7 @@ one.
 | Context | `ContextChip` — dot + name | Repeated on nearly every row; a filled pill would read as an alert. |
 | Reliability | `ReliabilityBadge` + `DegradedSourceNotice` | `accounts.reliability` surfaced wherever derived data is shown. |
 | Connector identity | Vendor marks in `source-marks.tsx` | Settings → Connections only. Picking an account is the one place a logo carries information. |
+| Unofficial source | Amber risk panel + acknowledgement checkbox | Zalo personal and Facebook personal messages. The `unofficial` tier is shown on the card and connecting is gated on an explicit acknowledgement — the risk is stated where the decision is made, not in a doc. |
 | Autonomy level | `AutonomyBadge` + `Progress` | Evidence is the argument for a level, so it sits beside it. |
 | Navigation | `Sidebar` + `Command` (⌘K) | Long sittings; changing context should not need the mouse. |
 | Session scope | `live` marker on the sidebar's context list | The rule deciding what agents may touch, shown next to the contexts it governs — read from `SessionProvider`, so clocking out clears it. |

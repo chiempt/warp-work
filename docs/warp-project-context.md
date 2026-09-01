@@ -107,9 +107,10 @@ building on that assumption fails around week three.
 | Google Calendar | Full official API | `official` | Build first |
 | Google Drive | Full official API | `official` | Build first |
 | Zalo OA (Official Account) | Official API, business accounts only | `official` | Phase 4 |
-| Zalo personal | No official API | `unofficial` | Ban risk. Avoid. |
+| Zalo personal | No official API | `unofficial` | Ban risk. Enabled by the owner, 2026-09-01. |
 | Facebook Page / Messenger | Official API, pages only | `official` | Optional |
-| Facebook personal messages | No API | — | Not possible |
+| Facebook personal messages | No API | `unofficial` | Breaks silently. Enabled by the owner, 2026-09-01. |
+| Telegram Bot API | Official, documented | `official` | Optional. A bot sees only what is addressed to it. |
 | Instagram Business | Official Graph API | `official` | Optional |
 | Instagram personal | No API | — | Not possible |
 | Manual entry / email forwarding | Always available | `manual` | Fallback for everything |

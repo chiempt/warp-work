@@ -89,6 +89,11 @@ openapi-check: openapi
 		exit 1; \
 	fi
 
+## google: write Google OAuth credentials into infra/.env
+.PHONY: google
+google:
+	@bash infra/scripts/set-google.sh
+
 ## plan: rebuild the spreadsheet view from docs/planning/backlog.csv
 #
 # The CSV is the source of truth — it is what a pull request touches and what
