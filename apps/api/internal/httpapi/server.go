@@ -17,7 +17,9 @@ import (
 	"github.com/chiempham/warp-work/apps/api/internal/api"
 	"github.com/chiempham/warp-work/internal/auth"
 	"github.com/chiempham/warp-work/internal/config"
+	warpcontexts "github.com/chiempham/warp-work/internal/contexts"
 	"github.com/chiempham/warp-work/internal/platform/postgres"
+	"github.com/chiempham/warp-work/internal/store"
 )
 
 // Server owns the HTTP listener and its dependencies.
@@ -76,7 +78,7 @@ func (s *Server) routes() error {
 	// — and hands the versioned API over wholesale. Routes are not declared
 	// here; they are declared in the spec.
 	apiServer, err := api.NewServer(
-		NewHandler(s.cfg, s.logger, s.pool, s.auth),
+		NewHandler(s.cfg, s.logger, s.pool, s.auth, warpcontexts.NewService(store.New(s.pool))),
 		&securityHandler{auth: s.auth, logger: s.logger},
 		api.WithErrorHandler(ogenErrorHandler(s.logger)),
 		api.WithNotFound(notFoundHandler),

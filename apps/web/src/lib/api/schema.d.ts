@@ -217,7 +217,19 @@ export interface paths {
          */
         get: operations["listContexts"];
         put?: never;
-        post?: never;
+        /**
+         * Create a context
+         * @description Adds a life area. Contexts are the organising axis, so this is the one
+         *     write that changes what every other resource can be filed under.
+         *
+         *     `slug` is unique per owner and immutable once set — it is what a saved
+         *     link and a routing rule refer to. Renaming is a change to `name`.
+         *
+         *     A `parentId` nests the new context under an existing one, which inherits
+         *     defaults from it. The tree is guarded against cycles at write time; a
+         *     parent that would create one is refused.
+         */
+        post: operations["createContext"];
         delete?: never;
         options?: never;
         head?: never;
@@ -505,6 +517,28 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        CreateContextRequest: {
+            /**
+             * @description Immutable, unique per owner, and what routing rules and saved links
+             *     refer to. The pattern is the `contexts_slug_format` constraint.
+             * @example job-a
+             */
+            slug: string;
+            /** @example Remote job A */
+            name: string;
+            kind: components["schemas"]["ContextKind"];
+            /**
+             * Format: uuid
+             * @description Nest under an existing context. Null for a root context.
+             */
+            parentId?: string | null;
+            color?: string | null;
+            /**
+             * @description How the system writes on the owner's behalf here. It never leaks
+             *     into another context.
+             */
+            toneProfile?: string;
         };
         ContextList: {
             items: components["schemas"]["Context"][];
@@ -815,6 +849,24 @@ export interface components {
         };
         /** @description No valid session. */
         Unauthenticated: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description The resource already exists. */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Well-formed, but the values are not acceptable. */
+        Unprocessable: {
             headers: {
                 [name: string]: unknown;
             };
@@ -1142,6 +1194,33 @@ export interface operations {
                     "application/json": components["schemas"]["ContextList"];
                 };
             };
+            default: components["responses"]["Error"];
+        };
+    };
+    createContext: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContextRequest"];
+            };
+        };
+        responses: {
+            /** @description The context that was created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Context"];
+                };
+            };
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
             default: components["responses"]["Error"];
         };
     };

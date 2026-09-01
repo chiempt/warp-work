@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { LoaderCircleIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -67,7 +68,9 @@ export function ContextForm({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const { contexts, save } = useContexts()
+  const { contexts, create, save } = useContexts()
+  const [pending, setPending] = React.useState(false)
+  const [failure, setFailure] = React.useState<string | null>(null)
   const isEdit = context !== null
 
   const [draft, setDraft] = React.useState<Context>(context ?? blank())
@@ -118,14 +121,36 @@ export function ContextForm({
   const valid =
     draft.name.trim() !== "" && draft.slug !== "" && !slugBad && !slugTaken
 
-  const submit = () => {
+  const submit = async () => {
     if (!valid) return
-    save({
+
+    const next = {
       ...draft,
       name: draft.name.trim(),
       toneProfile: draft.toneProfile.trim(),
       activeHours: draft.activeHours.trim() || "Always",
-    })
+    }
+
+    // Editing is local: the contract has no update operation yet, so pretending
+    // otherwise would show a change that no server ever received.
+    if (isEdit) {
+      save(next)
+      onOpenChange(false)
+      return
+    }
+
+    setPending(true)
+    setFailure(null)
+
+    const result = await create(next)
+    setPending(false)
+
+    if (!result.ok) {
+      // The sheet stays open with the values intact. A slug collision is fixed by
+      // editing one field, not by typing the whole thing again.
+      setFailure(result.message)
+      return
+    }
     onOpenChange(false)
   }
 
@@ -286,12 +311,29 @@ export function ContextForm({
           </div>
         </div>
 
+        {failure ? (
+          <p
+            role="alert"
+            className="mx-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          >
+            {failure}
+          </p>
+        ) : null}
+
         <SheetFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={submit} disabled={!valid}>
-            {isEdit ? "Save changes" : "Create context"}
+          <Button onClick={submit} disabled={!valid || pending}>
+            {pending ? (
+              <>
+                <LoaderCircleIcon className="animate-spin" /> Creating…
+              </>
+            ) : isEdit ? (
+              "Save changes"
+            ) : (
+              "Create context"
+            )}
           </Button>
         </SheetFooter>
       </SheetContent>

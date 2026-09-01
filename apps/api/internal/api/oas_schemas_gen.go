@@ -719,7 +719,8 @@ func (s *Context) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
 }
 
-func (*Context) getContextRes() {}
+func (*Context) createContextRes() {}
+func (*Context) getContextRes()    {}
 
 // Ref: #/components/schemas/ContextKind
 type ContextKind string
@@ -871,6 +872,88 @@ func (s *CreateCommitmentRequest) SetDueAt(val OptNilDateTime) {
 type CreateCommitmentUnprocessableEntity ErrorEnvelope
 
 func (*CreateCommitmentUnprocessableEntity) createCommitmentRes() {}
+
+type CreateContextConflict ErrorEnvelope
+
+func (*CreateContextConflict) createContextRes() {}
+
+// Ref: #/components/schemas/CreateContextRequest
+type CreateContextRequest struct {
+	// Immutable, unique per owner, and what routing rules and saved links refer to. The pattern is the
+	// `contexts_slug_format` constraint.
+	Slug string      `json:"slug"`
+	Name string      `json:"name"`
+	Kind ContextKind `json:"kind"`
+	// Nest under an existing context. Null for a root context.
+	ParentId OptNilUUID   `json:"parentId"`
+	Color    OptNilString `json:"color"`
+	// How the system writes on the owner's behalf here. It never leaks into another context.
+	ToneProfile OptString `json:"toneProfile"`
+}
+
+// GetSlug returns the value of Slug.
+func (s *CreateContextRequest) GetSlug() string {
+	return s.Slug
+}
+
+// GetName returns the value of Name.
+func (s *CreateContextRequest) GetName() string {
+	return s.Name
+}
+
+// GetKind returns the value of Kind.
+func (s *CreateContextRequest) GetKind() ContextKind {
+	return s.Kind
+}
+
+// GetParentId returns the value of ParentId.
+func (s *CreateContextRequest) GetParentId() OptNilUUID {
+	return s.ParentId
+}
+
+// GetColor returns the value of Color.
+func (s *CreateContextRequest) GetColor() OptNilString {
+	return s.Color
+}
+
+// GetToneProfile returns the value of ToneProfile.
+func (s *CreateContextRequest) GetToneProfile() OptString {
+	return s.ToneProfile
+}
+
+// SetSlug sets the value of Slug.
+func (s *CreateContextRequest) SetSlug(val string) {
+	s.Slug = val
+}
+
+// SetName sets the value of Name.
+func (s *CreateContextRequest) SetName(val string) {
+	s.Name = val
+}
+
+// SetKind sets the value of Kind.
+func (s *CreateContextRequest) SetKind(val ContextKind) {
+	s.Kind = val
+}
+
+// SetParentId sets the value of ParentId.
+func (s *CreateContextRequest) SetParentId(val OptNilUUID) {
+	s.ParentId = val
+}
+
+// SetColor sets the value of Color.
+func (s *CreateContextRequest) SetColor(val OptNilString) {
+	s.Color = val
+}
+
+// SetToneProfile sets the value of ToneProfile.
+func (s *CreateContextRequest) SetToneProfile(val OptString) {
+	s.ToneProfile = val
+}
+
+type CreateContextUnprocessableEntity ErrorEnvelope
+
+func (*CreateContextUnprocessableEntity) createContextRes() {}
 
 type CreateTaskNotFound ErrorEnvelope
 

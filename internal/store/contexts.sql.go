@@ -136,3 +136,19 @@ func (q *Queries) ListContexts(ctx context.Context, arg ListContextsParams) ([]C
 	}
 	return items, nil
 }
+
+const nextContextPosition = `-- name: NextContextPosition :one
+SELECT COALESCE(MAX(position) + 1, 0)::integer FROM contexts WHERE user_id = $1
+`
+
+// NextContextPosition places a new context after the ones that exist.
+//
+// Read separately rather than computed inside the insert so the insert stays a
+// plain statement sqlc can type. A race here costs nothing: two contexts would
+// share a position, and ListContexts breaks that tie by name.
+func (q *Queries) NextContextPosition(ctx context.Context, userID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, nextContextPosition, userID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}

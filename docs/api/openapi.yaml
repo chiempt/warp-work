@@ -395,6 +395,40 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+    post:
+      operationId: createContext
+      tags: [contexts]
+      summary: Create a context
+      description: |
+        Adds a life area. Contexts are the organising axis, so this is the one
+        write that changes what every other resource can be filed under.
+
+        `slug` is unique per owner and immutable once set — it is what a saved
+        link and a routing rule refer to. Renaming is a change to `name`.
+
+        A `parentId` nests the new context under an existing one, which inherits
+        defaults from it. The tree is guarded against cycles at write time; a
+        parent that would create one is refused.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContextRequest"
+      responses:
+        "201":
+          description: The context that was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Context"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        default:
+          $ref: "#/components/responses/Error"
+
   /api/v1/contexts/{contextId}:
     get:
       operationId: getContext
@@ -647,6 +681,18 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
+    Conflict:
+      description: The resource already exists.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Unprocessable:
+      description: Well-formed, but the values are not acceptable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
 
   schemas:
     ErrorEnvelope:
@@ -864,6 +910,42 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    CreateContextRequest:
+      type: object
+      required: [slug, name, kind]
+      properties:
+        slug:
+          type: string
+          description: |
+            Immutable, unique per owner, and what routing rules and saved links
+            refer to. The pattern is the `contexts_slug_format` constraint.
+          pattern: "^[a-z0-9][a-z0-9_-]*$"
+          minLength: 1
+          maxLength: 64
+          example: job-a
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Remote job A
+        kind:
+          $ref: "#/components/schemas/ContextKind"
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Nest under an existing context. Null for a root context.
+        color:
+          type: string
+          nullable: true
+          maxLength: 32
+        toneProfile:
+          type: string
+          maxLength: 2000
+          description: |
+            How the system writes on the owner's behalf here. It never leaks
+            into another context.
 
     ContextList:
       type: object

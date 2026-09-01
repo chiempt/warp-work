@@ -15,3 +15,11 @@ ORDER BY position, name;
 INSERT INTO contexts (id, user_id, parent_id, slug, name, kind, color, active_hours, tone_profile, position)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
+
+-- NextContextPosition places a new context after the ones that exist.
+--
+-- Read separately rather than computed inside the insert so the insert stays a
+-- plain statement sqlc can type. A race here costs nothing: two contexts would
+-- share a position, and ListContexts breaks that tie by name.
+-- name: NextContextPosition :one
+SELECT COALESCE(MAX(position) + 1, 0)::integer FROM contexts WHERE user_id = $1;

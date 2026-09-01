@@ -199,8 +199,12 @@ func TestUnknownEndpoint_is404InTheEnvelope(t *testing.T) {
 }
 
 func TestWrongMethod_is405WithAllow(t *testing.T) {
+	// A path the contract defines with GET and nothing else. It used to be
+	// /api/v1/contexts, which grew a POST when createContext was added — at
+	// which point this stopped testing a wrong method and started testing an
+	// unauthenticated one.
 	rec := httptest.NewRecorder()
-	newServer(t).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/contexts", nil))
+	newServer(t).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/auth/providers", nil))
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("want 405, got %d", rec.Code)

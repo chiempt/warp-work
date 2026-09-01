@@ -20,7 +20,10 @@ var (
 	rn3AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
-	rn4AllowedHeaders = map[string]string{
+	rn5AllowedHeaders = map[string]string{
+		"POST": "Content-Type",
+	}
+	rn6AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
 )
@@ -444,11 +447,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						switch r.Method {
 						case "GET":
 							s.handleListContextsRequest([0]string{}, elemIsEscaped, w, r)
+						case "POST":
+							s.handleCreateContextRequest([0]string{}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "GET",
-								allowedHeaders: nil,
-								acceptPost:     "",
+								allowedMethods: "GET,POST",
+								allowedHeaders: rn5AllowedHeaders,
+								acceptPost:     "application/json",
 								acceptPatch:    "",
 							})
 						}
@@ -537,7 +542,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					default:
 						s.notAllowed(w, r, notAllowedParams{
 							allowedMethods: "POST",
-							allowedHeaders: rn4AllowedHeaders,
+							allowedHeaders: rn6AllowedHeaders,
 							acceptPost:     "application/json",
 							acceptPatch:    "",
 						})
@@ -1019,6 +1024,15 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							r.name = ListContextsOperation
 							r.summary = "List contexts"
 							r.operationID = "listContexts"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/contexts"
+							r.args = args
+							r.count = 0
+							return r, true
+						case "POST":
+							r.name = CreateContextOperation
+							r.summary = "Create a context"
+							r.operationID = "createContext"
 							r.operationGroup = ""
 							r.pathPattern = "/api/v1/contexts"
 							r.args = args

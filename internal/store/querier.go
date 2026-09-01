@@ -22,6 +22,10 @@ type Querier interface {
 	// column default, so rows sort by creation time. See docs/conventions.md §3.
 	// created_at and updated_at come from defaults and a trigger.
 	CreateContext(ctx context.Context, arg CreateContextParams) (Context, error)
+	// id is supplied by the application as UUIDv7 rather than taken from the
+	// column default, so rows sort by creation time. See docs/conventions.md §3.
+	// created_at and updated_at come from defaults and a trigger.
+	CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error)
 	CreateUser(ctx context.Context, id uuid.UUID) (User, error)
 	// Timezone is deliberately absent: the column default is the single place that
 	// value is written down.
@@ -39,6 +43,7 @@ type Querier interface {
 	// identifier, the same role the `sub` claim plays for Google.
 	GetPasswordCredential(ctx context.Context, email string) (GetPasswordCredentialRow, error)
 	GetSignalByExternalID(ctx context.Context, arg GetSignalByExternalIDParams) (Signal, error)
+	GetTask(ctx context.Context, id uuid.UUID) (Task, error)
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (UserProfile, error)
 	// IngestSignal is idempotent. Re-running a sync over items already seen returns
 	// the stored rows untouched rather than writing new ones — signals are
@@ -59,6 +64,7 @@ type Querier interface {
 	// ListLowConfidenceAssignments backs the manual routing queue. The threshold is
 	// open question 1 — the caller supplies it rather than the query assuming one.
 	ListLowConfidenceAssignments(ctx context.Context, threshold float64) ([]SignalContext, error)
+	ListTasks(ctx context.Context, userID uuid.UUID) ([]Task, error)
 	// ListUnroutedSignals feeds the router. Oldest first, so a backlog drains in
 	// the order things actually happened.
 	ListUnroutedSignals(ctx context.Context, arg ListUnroutedSignalsParams) ([]Signal, error)
@@ -85,6 +91,18 @@ type Querier interface {
 	MarkProviderUsed(ctx context.Context, arg MarkProviderUsedParams) error
 	// MarkSignalProcessed sets the only column on a signal that may ever change.
 	MarkSignalProcessed(ctx context.Context, arg MarkSignalProcessedParams) error
+	// NextContextPosition places a new context after the ones that exist.
+	//
+	// Read separately rather than computed inside the insert so the insert stays a
+	// plain statement sqlc can type. A race here costs nothing: two contexts would
+	// share a position, and ListContexts breaks that tie by name.
+	NextContextPosition(ctx context.Context, userID uuid.UUID) (int32, error)
+	// NextTaskPosition places a new task after the ones that exist.
+	//
+	// Read separately rather than computed inside the insert so the insert stays a
+	// plain statement sqlc can type. A race here costs nothing: two tasks would
+	// share a position, and ListTasks breaks that tie by name.
+	NextTaskPosition(ctx context.Context, userID uuid.UUID) (int32, error)
 	// ProviderByKindSubject resolves a federated identity. Matching is on the
 	// provider's immutable subject, never the email.
 	ProviderByKindSubject(ctx context.Context, arg ProviderByKindSubjectParams) (AuthProvider, error)

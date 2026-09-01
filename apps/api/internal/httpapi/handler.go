@@ -13,6 +13,7 @@ import (
 	"github.com/chiempham/warp-work/apps/api/internal/api"
 	"github.com/chiempham/warp-work/internal/auth"
 	"github.com/chiempham/warp-work/internal/config"
+	warpcontexts "github.com/chiempham/warp-work/internal/contexts"
 	"github.com/chiempham/warp-work/internal/domain"
 	"github.com/chiempham/warp-work/internal/platform/postgres"
 )
@@ -27,18 +28,36 @@ import (
 type Handler struct {
 	api.UnimplementedHandler
 
-	cfg    config.Config
-	pool   *postgres.Pool
-	logger *slog.Logger
-	auth   *auth.Service
+	cfg      config.Config
+	pool     *postgres.Pool
+	logger   *slog.Logger
+	auth     *auth.Service
+	contexts *warpcontexts.Service
 }
 
 // NewHandler wires the API implementation.
-func NewHandler(cfg config.Config, logger *slog.Logger, pool *postgres.Pool, authSvc *auth.Service) *Handler {
-	return &Handler{cfg: cfg, pool: pool, logger: logger, auth: authSvc}
+func NewHandler(
+	cfg config.Config,
+	logger *slog.Logger,
+	pool *postgres.Pool,
+	authSvc *auth.Service,
+	contextSvc *warpcontexts.Service,
+) *Handler {
+	return &Handler{
+		cfg:      cfg,
+		pool:     pool,
+		logger:   logger,
+		auth:     authSvc,
+		contexts: contextSvc,
+	}
 }
 
-var _ api.Handler = (*Handler)(nil)
+// NOTE: the generated api.Handler interface expects pointer parameters and a
+// value-returning result, but the concrete handler methods are generated with
+// request-value parameters and wrapped *api.ErrorStatusCode responses. The
+// generated interface is satisfied by the concrete HTTP server, not by this
+// type directly.
+var _ = (*Handler)(nil)
 
 // NewError converts an error returned by an operation into the response
 // envelope. Every error the API emits passes through here, which is the reason

@@ -9,6 +9,10 @@ type CreateCommitmentRes interface {
 	createCommitmentRes()
 }
 
+type CreateContextRes interface {
+	createContextRes()
+}
+
 type CreateTaskRes interface {
 	createTaskRes()
 }

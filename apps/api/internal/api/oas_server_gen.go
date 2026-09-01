@@ -42,6 +42,19 @@ type Handler interface {
 	//
 	// POST /api/v1/commitments
 	CreateCommitment(ctx context.Context, req *CreateCommitmentRequest) (CreateCommitmentRes, error)
+	// CreateContext implements createContext operation.
+	//
+	// Adds a life area. Contexts are the organising axis, so this is the one write that changes what every
+	// other resource can be filed under.
+	//
+	// `slug` is unique per owner and immutable once set — it is what a saved link and a routing rule
+	// refer to. Renaming is a change to `name`.
+	//
+	// A `parentId` nests the new context under an existing one, which inherits defaults from it. The tree
+	// is guarded against cycles at write time; a parent that would create one is refused.
+	//
+	// POST /api/v1/contexts
+	CreateContext(ctx context.Context, req *CreateContextRequest) (CreateContextRes, error)
 	// CreateTask implements createTask operation.
 	//
 	// The manual path in, and a first-class one: a task decided in a meeting leaves no signal to extract
