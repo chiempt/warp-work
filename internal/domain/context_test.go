@@ -38,9 +38,28 @@ func TestActiveHours_keepsStudyQuietDuringWorkHours(t *testing.T) {
 
 func TestContext_rejectsSelfParenting(t *testing.T) {
 	id := domain.MustNewID()
-	c := domain.Context{ID: id, ParentID: &id, Name: "Self", Kind: domain.ContextPersonal}
+	c := domain.Context{ID: id, ParentID: &id, Name: "Self", Color: domain.ContextGreen}
 
 	if err := c.Valid(); err == nil {
 		t.Fatal("a context cannot be its own parent")
+	}
+}
+
+// A context without a colour is shown in the neutral tone. That is a choice the
+// owner is allowed to make, not a missing value, so it must validate.
+func TestContextColor_emptyIsValid(t *testing.T) {
+	if err := domain.ContextColor("").Valid(); err != nil {
+		t.Fatalf("an uncoloured context is valid: %v", err)
+	}
+}
+
+// The colour is a token name the interface has to resolve. Anything outside the
+// set would reach the browser as a class that does not exist and render as no
+// colour at all, so it is refused here as well as by contexts_color_token.
+func TestContextColor_rejectsUnknownToken(t *testing.T) {
+	for _, c := range []domain.ContextColor{"work", "#ff0000", "puce"} {
+		if err := c.Valid(); err == nil {
+			t.Errorf("color %q is not a token the interface can resolve", string(c))
+		}
 	}
 }

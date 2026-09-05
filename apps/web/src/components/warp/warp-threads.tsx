@@ -1,14 +1,17 @@
 import { cn } from "@/lib/utils"
 
 import { contexts } from "@/lib/mock/data"
-import type { ContextKind } from "@/lib/mock/types"
+import type { ContextColor } from "@/lib/mock/types"
 
 const THREAD_COUNT = 72
 
-const kindStroke: Record<ContextKind, string> = {
-  work: "var(--context-work)",
-  study: "var(--context-study)",
-  personal: "var(--context-personal)",
+const colorStroke: Record<ContextColor, string> = {
+  slate: "var(--context-slate)",
+  blue: "var(--context-blue)",
+  violet: "var(--context-violet)",
+  green: "var(--context-green)",
+  teal: "var(--context-teal)",
+  rose: "var(--context-rose)",
 }
 
 /** Deterministic 0–1. No `Math.random()`: the weave must be identical on both renders. */
@@ -34,7 +37,7 @@ function centreWeight(index: number, total: number) {
  * woven into.
  *
  * Most threads are hairlines in the border colour. Seven are not: one per context, in
- * that context's kind colour, spaced across the field in the order they nest. So the
+ * that context's own accent, spaced across the field in the order they nest. So the
  * figure says the one thing worth saying on this screen — several parallel lives, held
  * under tension, in one frame — without a logo, an arrow, or a word of explanation.
  *
@@ -42,14 +45,14 @@ function centreWeight(index: number, total: number) {
  */
 export function WarpThreads({ className }: { className?: string }) {
   // Seven live threads, laid out the way the contexts actually sit: siblings close
-  // together, a wide gap where the kind changes. Evenly spaced they would be seven
-  // stripes; grouped, the field shows three work threads, one study thread, and a family
-  // of three personal ones — which is the shape of the owner's week.
+  // together, a wide gap where the accent changes. Evenly spaced they would be seven
+  // stripes; grouped, the field shows three blue threads, one violet, and a family of
+  // three green ones — which is the shape of the owner's week.
   const live = new Map<number, (typeof contexts)[number]>()
   let cursor = 14
   contexts.forEach((context, index) => {
     if (index > 0) {
-      cursor += contexts[index - 1].kind === context.kind ? 5 : 13
+      cursor += contexts[index - 1].color === context.color ? 5 : 13
     }
     live.set(cursor, context)
   })
@@ -88,7 +91,7 @@ export function WarpThreads({ className }: { className?: string }) {
               y1="0"
               y2="100"
               vectorEffect="non-scaling-stroke"
-              stroke={context ? kindStroke[context.kind] : "var(--border)"}
+              stroke={context?.color ? colorStroke[context.color] : "var(--border)"}
               strokeWidth={context ? 1.5 : 1}
               strokeOpacity={
                 context ? 0.35 + weight * 0.65 : jitter * weight * 0.6

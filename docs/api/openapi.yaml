@@ -407,8 +407,8 @@ paths:
         link and a routing rule refer to. Renaming is a change to `name`.
 
         A `parentId` nests the new context under an existing one, which inherits
-        defaults from it. The tree is guarded against cycles at write time; a
-        parent that would create one is refused.
+        defaults from it. The tree is guarded against cycles at write time, and
+        capped at three levels; a parent that would breach either is refused.
       requestBody:
         required: true
         content:
@@ -868,13 +868,17 @@ components:
         session:
           $ref: "#/components/schemas/Session"
 
-    ContextKind:
+    ContextColor:
       type: string
-      enum: [work, study, personal]
+      description: |
+        The accent a context is shown in. Hue names, not life areas: the tree
+        already groups, so choosing a colour must not require choosing a
+        category first.
+      enum: [slate, blue, violet, green, teal, rose]
 
     Context:
       type: object
-      required: [id, slug, name, kind, position, isArchived, createdAt, updatedAt]
+      required: [id, slug, name, position, isArchived, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -890,10 +894,9 @@ components:
         name:
           type: string
           example: Remote job A
-        kind:
-          $ref: "#/components/schemas/ContextKind"
         color:
-          type: string
+          allOf:
+            - $ref: "#/components/schemas/ContextColor"
           nullable: true
         toneProfile:
           type: string
@@ -913,7 +916,7 @@ components:
 
     CreateContextRequest:
       type: object
-      required: [slug, name, kind]
+      required: [slug, name]
       properties:
         slug:
           type: string
@@ -929,17 +932,17 @@ components:
           minLength: 1
           maxLength: 200
           example: Remote job A
-        kind:
-          $ref: "#/components/schemas/ContextKind"
         parentId:
           type: string
           format: uuid
           nullable: true
-          description: Nest under an existing context. Null for a root context.
+          description: |
+            Nest under an existing context. Null for a root context. Nesting is
+            capped at three levels.
         color:
-          type: string
+          allOf:
+            - $ref: "#/components/schemas/ContextColor"
           nullable: true
-          maxLength: 32
         toneProfile:
           type: string
           maxLength: 2000

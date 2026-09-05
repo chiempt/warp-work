@@ -494,49 +494,6 @@ func (ns NullCommitmentStatus) Value() (driver.Value, error) {
 	return string(ns.CommitmentStatus), nil
 }
 
-type ContextKind string
-
-const (
-	ContextKindWork     ContextKind = "work"
-	ContextKindStudy    ContextKind = "study"
-	ContextKindPersonal ContextKind = "personal"
-)
-
-func (e *ContextKind) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = ContextKind(s)
-	case string:
-		*e = ContextKind(s)
-	default:
-		return fmt.Errorf("unsupported scan type for ContextKind: %T", src)
-	}
-	return nil
-}
-
-type NullContextKind struct {
-	ContextKind ContextKind
-	Valid       bool // Valid is true if ContextKind is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullContextKind) Scan(value interface{}) error {
-	if value == nil {
-		ns.ContextKind, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.ContextKind.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullContextKind) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.ContextKind), nil
-}
-
 type EventStatus string
 
 const (
@@ -1342,7 +1299,6 @@ type Context struct {
 	ParentID    *uuid.UUID
 	Slug        string
 	Name        string
-	Kind        ContextKind
 	Color       *string
 	ActiveHours []byte
 	ToneProfile *string

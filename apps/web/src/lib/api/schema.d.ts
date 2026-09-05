@@ -226,8 +226,8 @@ export interface paths {
          *     link and a routing rule refer to. Renaming is a change to `name`.
          *
          *     A `parentId` nests the new context under an existing one, which inherits
-         *     defaults from it. The tree is guarded against cycles at write time; a
-         *     parent that would create one is refused.
+         *     defaults from it. The tree is guarded against cycles at write time, and
+         *     capped at three levels; a parent that would breach either is refused.
          */
         post: operations["createContext"];
         delete?: never;
@@ -489,8 +489,13 @@ export interface components {
             user: components["schemas"]["SignedInUser"];
             session: components["schemas"]["Session"];
         };
-        /** @enum {string} */
-        ContextKind: "work" | "study" | "personal";
+        /**
+         * @description The accent a context is shown in. Hue names, not life areas: the tree
+         *     already groups, so choosing a colour must not require choosing a
+         *     category first.
+         * @enum {string}
+         */
+        ContextColor: "slate" | "blue" | "violet" | "green" | "teal" | "rose";
         Context: {
             /** Format: uuid */
             id: string;
@@ -503,8 +508,7 @@ export interface components {
             slug: string;
             /** @example Remote job A */
             name: string;
-            kind: components["schemas"]["ContextKind"];
-            color?: string | null;
+            color?: components["schemas"]["ContextColor"] | null;
             /** @description How the system writes on the owner's behalf in this context. */
             toneProfile?: string;
             /**
@@ -527,13 +531,13 @@ export interface components {
             slug: string;
             /** @example Remote job A */
             name: string;
-            kind: components["schemas"]["ContextKind"];
             /**
              * Format: uuid
-             * @description Nest under an existing context. Null for a root context.
+             * @description Nest under an existing context. Null for a root context. Nesting is
+             *     capped at three levels.
              */
             parentId?: string | null;
-            color?: string | null;
+            color?: components["schemas"]["ContextColor"] | null;
             /**
              * @description How the system writes on the owner's behalf here. It never leaks
              *     into another context.

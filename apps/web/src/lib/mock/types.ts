@@ -8,7 +8,7 @@
  * hand-written twice — that is the whole point of the spec being the contract.
  */
 
-export type ContextKind = "work" | "study" | "personal"
+export type ContextColor = "slate" | "blue" | "violet" | "green" | "teal" | "rose"
 
 export type AccountProvider =
   | "gmail"
@@ -65,7 +65,8 @@ export interface Context {
   parentId: string | null
   slug: string
   name: string
-  kind: ContextKind
+  /** Null renders in the neutral tone — a choice, not a missing value. */
+  color: ContextColor | null
   toneProfile: string
   activeHours: string
 }

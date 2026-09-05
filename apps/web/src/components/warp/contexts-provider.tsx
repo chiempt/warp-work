@@ -4,7 +4,7 @@ import * as React from "react"
 
 import { api } from "@/lib/api/client"
 import { contexts as seedContexts } from "@/lib/mock/data"
-import type { Context, ContextKind } from "@/lib/mock/types"
+import type { Context, ContextColor } from "@/lib/mock/types"
 import type { components } from "@/lib/api/schema"
 
 type ApiContext = components["schemas"]["Context"]
@@ -45,7 +45,7 @@ export function ContextsProvider({ children }: { children: React.ReactNode }) {
           body: {
             slug: context.slug,
             name: context.name,
-            kind: context.kind,
+            color: context.color,
             parentId: context.parentId,
             toneProfile: context.toneProfile || undefined,
           },
@@ -97,7 +97,7 @@ function fromApi(row: ApiContext): Context {
     parentId: row.parentId ?? null,
     slug: row.slug,
     name: row.name,
-    kind: row.kind as ContextKind,
+    color: (row.color ?? null) as ContextColor | null,
     toneProfile: row.toneProfile ?? "",
     activeHours: "Always",
   }

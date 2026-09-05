@@ -194,7 +194,7 @@ export function AppSidebar({ email }: { email?: string }) {
                     >
                       <ContextChip
                         contextId={context.id}
-                        preview={{ name: context.name, kind: context.kind }}
+                        preview={{ name: context.name, color: context.color }}
                         className="text-[13px]"
                       />
                     </SidebarMenuButton>

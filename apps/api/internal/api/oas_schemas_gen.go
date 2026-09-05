@@ -595,11 +595,10 @@ func (*CompleteGoogleSignInFound) completeGoogleSignInRes() {}
 type Context struct {
 	ID uuid.UUID `json:"id"`
 	// Null for a root context. A child inherits its parent's defaults.
-	ParentId OptNilUUID   `json:"parentId"`
-	Slug     string       `json:"slug"`
-	Name     string       `json:"name"`
-	Kind     ContextKind  `json:"kind"`
-	Color    OptNilString `json:"color"`
+	ParentId OptNilUUID         `json:"parentId"`
+	Slug     string             `json:"slug"`
+	Name     string             `json:"name"`
+	Color    OptNilContextColor `json:"color"`
 	// How the system writes on the owner's behalf in this context.
 	ToneProfile OptString `json:"toneProfile"`
 	// Display order among siblings.
@@ -629,13 +628,8 @@ func (s *Context) GetName() string {
 	return s.Name
 }
 
-// GetKind returns the value of Kind.
-func (s *Context) GetKind() ContextKind {
-	return s.Kind
-}
-
 // GetColor returns the value of Color.
-func (s *Context) GetColor() OptNilString {
+func (s *Context) GetColor() OptNilContextColor {
 	return s.Color
 }
 
@@ -684,13 +678,8 @@ func (s *Context) SetName(val string) {
 	s.Name = val
 }
 
-// SetKind sets the value of Kind.
-func (s *Context) SetKind(val ContextKind) {
-	s.Kind = val
-}
-
 // SetColor sets the value of Color.
-func (s *Context) SetColor(val OptNilString) {
+func (s *Context) SetColor(val OptNilContextColor) {
 	s.Color = val
 }
 
@@ -722,32 +711,46 @@ func (s *Context) SetUpdatedAt(val time.Time) {
 func (*Context) createContextRes() {}
 func (*Context) getContextRes()    {}
 
-// Ref: #/components/schemas/ContextKind
-type ContextKind string
+// The accent a context is shown in. Hue names, not life areas: the tree already groups, so choosing a
+// colour must not require choosing a category first.
+// Ref: #/components/schemas/ContextColor
+type ContextColor string
 
 const (
-	ContextKindWork     ContextKind = "work"
-	ContextKindStudy    ContextKind = "study"
-	ContextKindPersonal ContextKind = "personal"
+	ContextColorSlate  ContextColor = "slate"
+	ContextColorBlue   ContextColor = "blue"
+	ContextColorViolet ContextColor = "violet"
+	ContextColorGreen  ContextColor = "green"
+	ContextColorTeal   ContextColor = "teal"
+	ContextColorRose   ContextColor = "rose"
 )
 
-// AllValues returns all ContextKind values.
-func (ContextKind) AllValues() []ContextKind {
-	return []ContextKind{
-		ContextKindWork,
-		ContextKindStudy,
-		ContextKindPersonal,
+// AllValues returns all ContextColor values.
+func (ContextColor) AllValues() []ContextColor {
+	return []ContextColor{
+		ContextColorSlate,
+		ContextColorBlue,
+		ContextColorViolet,
+		ContextColorGreen,
+		ContextColorTeal,
+		ContextColorRose,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s ContextKind) MarshalText() ([]byte, error) {
+func (s ContextColor) MarshalText() ([]byte, error) {
 	switch s {
-	case ContextKindWork:
+	case ContextColorSlate:
 		return []byte(s), nil
-	case ContextKindStudy:
+	case ContextColorBlue:
 		return []byte(s), nil
-	case ContextKindPersonal:
+	case ContextColorViolet:
+		return []byte(s), nil
+	case ContextColorGreen:
+		return []byte(s), nil
+	case ContextColorTeal:
+		return []byte(s), nil
+	case ContextColorRose:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -755,16 +758,25 @@ func (s ContextKind) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *ContextKind) UnmarshalText(data []byte) error {
-	switch ContextKind(data) {
-	case ContextKindWork:
-		*s = ContextKindWork
+func (s *ContextColor) UnmarshalText(data []byte) error {
+	switch ContextColor(data) {
+	case ContextColorSlate:
+		*s = ContextColorSlate
 		return nil
-	case ContextKindStudy:
-		*s = ContextKindStudy
+	case ContextColorBlue:
+		*s = ContextColorBlue
 		return nil
-	case ContextKindPersonal:
-		*s = ContextKindPersonal
+	case ContextColorViolet:
+		*s = ContextColorViolet
+		return nil
+	case ContextColorGreen:
+		*s = ContextColorGreen
+		return nil
+	case ContextColorTeal:
+		*s = ContextColorTeal
+		return nil
+	case ContextColorRose:
+		*s = ContextColorRose
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -881,12 +893,11 @@ func (*CreateContextConflict) createContextRes() {}
 type CreateContextRequest struct {
 	// Immutable, unique per owner, and what routing rules and saved links refer to. The pattern is the
 	// `contexts_slug_format` constraint.
-	Slug string      `json:"slug"`
-	Name string      `json:"name"`
-	Kind ContextKind `json:"kind"`
-	// Nest under an existing context. Null for a root context.
-	ParentId OptNilUUID   `json:"parentId"`
-	Color    OptNilString `json:"color"`
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+	// Nest under an existing context. Null for a root context. Nesting is capped at three levels.
+	ParentId OptNilUUID         `json:"parentId"`
+	Color    OptNilContextColor `json:"color"`
 	// How the system writes on the owner's behalf here. It never leaks into another context.
 	ToneProfile OptString `json:"toneProfile"`
 }
@@ -901,18 +912,13 @@ func (s *CreateContextRequest) GetName() string {
 	return s.Name
 }
 
-// GetKind returns the value of Kind.
-func (s *CreateContextRequest) GetKind() ContextKind {
-	return s.Kind
-}
-
 // GetParentId returns the value of ParentId.
 func (s *CreateContextRequest) GetParentId() OptNilUUID {
 	return s.ParentId
 }
 
 // GetColor returns the value of Color.
-func (s *CreateContextRequest) GetColor() OptNilString {
+func (s *CreateContextRequest) GetColor() OptNilContextColor {
 	return s.Color
 }
 
@@ -931,18 +937,13 @@ func (s *CreateContextRequest) SetName(val string) {
 	s.Name = val
 }
 
-// SetKind sets the value of Kind.
-func (s *CreateContextRequest) SetKind(val ContextKind) {
-	s.Kind = val
-}
-
 // SetParentId sets the value of ParentId.
 func (s *CreateContextRequest) SetParentId(val OptNilUUID) {
 	s.ParentId = val
 }
 
 // SetColor sets the value of Color.
-func (s *CreateContextRequest) SetColor(val OptNilString) {
+func (s *CreateContextRequest) SetColor(val OptNilContextColor) {
 	s.Color = val
 }
 
@@ -1735,6 +1736,74 @@ func (o OptInt32) Get() (v int32, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInt32) Or(d int32) int32 {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilContextColor returns new OptNilContextColor with value set to v.
+func NewOptNilContextColor(v ContextColor) OptNilContextColor {
+	return OptNilContextColor{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilContextColor is optional nullable ContextColor.
+type OptNilContextColor struct {
+	Value ContextColor
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilContextColor was set.
+func (o OptNilContextColor) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilContextColor) Reset() {
+	var v ContextColor
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilContextColor) SetTo(v ContextColor) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilContextColor) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilContextColor) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ContextColor
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilContextColor) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilContextColor) Get() (v ContextColor, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilContextColor) Or(d ContextColor) ContextColor {
 	if v, ok := o.Get(); ok {
 		return v
 	}

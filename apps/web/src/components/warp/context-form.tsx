@@ -22,12 +22,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
-import { ContextChip } from "@/components/warp/context-chip"
+import { ContextChip, dotClass } from "@/components/warp/context-chip"
 import { slugify, useContexts } from "@/components/warp/contexts-provider"
 import { cn } from "@/lib/utils"
-import type { Context, ContextKind } from "@/lib/mock/types"
+import type { Context, ContextColor } from "@/lib/mock/types"
 
-const KINDS: ContextKind[] = ["work", "study", "personal"]
+/** `contexts_color_token` in the migration, and the ContextColor enum in the contract. */
+const COLORS: ContextColor[] = ["slate", "blue", "violet", "green", "teal", "rose"]
 const NO_PARENT = "__root__"
 
 /** `contexts_slug_format` in the migration. Enforced here so the two agree. */
@@ -38,7 +39,7 @@ const blank = (): Context => ({
   parentId: null,
   slug: "",
   name: "",
-  kind: "work",
+  color: "blue",
   toneProfile: "",
   activeHours: "",
 })
@@ -48,12 +49,13 @@ const blank = (): Context => ({
  *
  * This is the one form in Warp where the record being written is the axis everything
  * else hangs off — signals, tasks, people, memory notes and autonomy rules all carry a
- * `context_id`. So it asks for the two things that actually change behaviour, rather
- * than a name and nothing else:
+ * `context_id`.
  *
- *   - **Active hours**, which decide when this context is allowed to surface at all.
- *   - **Tone profile**, which is injected into every draft written for it and never
- *     leaks into another.
+ * Creating asks only for what is knowable at that moment: a name, a colour, where it
+ * nests, and the tone to write in. **Active hours** appear when editing and not before —
+ * a schedule for silencing a context is not something anyone can answer for a context
+ * that has never surfaced anything. The column defaults to `{}`, always active, which
+ * is the honest starting state and what the service already writes.
  *
  * The slug follows the name until it is edited by hand, and is validated against the
  * same pattern the database enforces.
@@ -179,26 +181,43 @@ export function ContextForm({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Kind</Label>
+              <Label>Colour</Label>
               <Select
-                value={draft.kind}
+                value={draft.color ?? "slate"}
                 onValueChange={(value) =>
-                  set("kind", (value as ContextKind) ?? draft.kind)
+                  set("color", (value as ContextColor) ?? draft.color)
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {(value) => (
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "size-1.5 shrink-0 rounded-full",
+                            dotClass(value as ContextColor),
+                          )}
+                        />
+                        {value}
+                      </span>
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {KINDS.map((kind) => (
-                    <SelectItem key={kind} value={kind}>
-                      {kind}
+                  {COLORS.map((color) => (
+                    <SelectItem key={color} value={color}>
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className={cn("size-1.5 shrink-0 rounded-full", dotClass(color))}
+                        />
+                        {color}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Decides the colour it carries everywhere.
+                The dot this context carries everywhere. A name, not a category.
               </p>
             </div>
 
@@ -261,19 +280,21 @@ export function ContextForm({
             </p>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="context-hours">Active hours</Label>
-            <Input
-              id="context-hours"
-              value={draft.activeHours}
-              onChange={(e) => set("activeHours", e.target.value)}
-              placeholder="Mon–Fri 19:00–22:00"
-            />
-            <p className="text-xs text-muted-foreground">
-              Outside these hours the context stays quiet — no reminders, and nothing
-              from it surfaces during a session scoped elsewhere. Empty means always.
-            </p>
-          </div>
+          {isEdit ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="context-hours">Active hours</Label>
+              <Input
+                id="context-hours"
+                value={draft.activeHours}
+                onChange={(e) => set("activeHours", e.target.value)}
+                placeholder="Mon–Fri 19:00–22:00"
+              />
+              <p className="text-xs text-muted-foreground">
+                Outside these hours the context stays quiet — no reminders, and nothing
+                from it surfaces during a session scoped elsewhere. Empty means always.
+              </p>
+            </div>
+          ) : null}
 
           <div className="space-y-1.5">
             <Label htmlFor="context-tone">Tone profile</Label>
@@ -304,7 +325,7 @@ export function ContextForm({
                 <ContextChip
                   contextId={draft.id}
                   className="text-sm text-foreground"
-                  preview={{ name: draft.name, kind: draft.kind }}
+                  preview={{ name: draft.name, color: draft.color }}
                 />
               )}
             </div>

@@ -1,46 +1,72 @@
 import { cn } from "@/lib/utils"
 import { contextById } from "@/lib/mock/data"
-import type { ContextKind } from "@/lib/mock/types"
+import type { ContextColor } from "@/lib/mock/types"
 
-const kindDot: Record<ContextKind, string> = {
-  work: "bg-context-work",
-  study: "bg-context-study",
-  personal: "bg-context-personal",
+const colorDot: Record<ContextColor, string> = {
+  slate: "bg-context-slate",
+  blue: "bg-context-blue",
+  violet: "bg-context-violet",
+  green: "bg-context-green",
+  teal: "bg-context-teal",
+  rose: "bg-context-rose",
 }
 
 /**
  * The context accent, for surfaces that colour a whole block rather than a dot — the
- * calendar grid. Kept here so there is exactly one mapping from `contexts.kind` to a
- * colour in the interface.
+ * calendar grid. Kept here so there is exactly one mapping from `contexts.color` to a
+ * class in the interface.
  */
-const kindTone: Record<ContextKind, { block: string; edge: string; text: string }> = {
-  work: {
-    block: "bg-context-work/15",
-    edge: "border-l-context-work",
-    text: "text-context-work",
+const colorTone: Record<ContextColor, { block: string; edge: string; text: string }> = {
+  slate: {
+    block: "bg-context-slate/15",
+    edge: "border-l-context-slate",
+    text: "text-context-slate",
   },
-  study: {
-    block: "bg-context-study/15",
-    edge: "border-l-context-study",
-    text: "text-context-study",
+  blue: {
+    block: "bg-context-blue/15",
+    edge: "border-l-context-blue",
+    text: "text-context-blue",
   },
-  personal: {
-    block: "bg-context-personal/15",
-    edge: "border-l-context-personal",
-    text: "text-context-personal",
+  violet: {
+    block: "bg-context-violet/15",
+    edge: "border-l-context-violet",
+    text: "text-context-violet",
+  },
+  green: {
+    block: "bg-context-green/15",
+    edge: "border-l-context-green",
+    text: "text-context-green",
+  },
+  teal: {
+    block: "bg-context-teal/15",
+    edge: "border-l-context-teal",
+    text: "text-context-teal",
+  },
+  rose: {
+    block: "bg-context-rose/15",
+    edge: "border-l-context-rose",
+    text: "text-context-rose",
   },
 }
 
+/**
+ * A context is allowed to have no colour, so every lookup goes through here rather
+ * than indexing the record directly — an uncoloured context renders in the neutral
+ * tone instead of resolving to a class name that does not exist.
+ */
+export function dotClass(color: ContextColor | null | undefined) {
+  return color ? colorDot[color] : "bg-muted-foreground"
+}
+
 export function contextTone(contextId: string | null) {
-  const kind = contextId ? contextById.get(contextId)?.kind : undefined
-  return kind
-    ? kindTone[kind]
+  const color = contextId ? contextById.get(contextId)?.color : undefined
+  return color
+    ? colorTone[color]
     : { block: "bg-muted", edge: "border-l-border", text: "text-muted-foreground" }
 }
 
 export function contextDot(contextId: string | null) {
-  const kind = contextId ? contextById.get(contextId)?.kind : undefined
-  return kind ? kindDot[kind] : "bg-muted-foreground"
+  return dotClass(contextId ? contextById.get(contextId)?.color : undefined)
 }
 
 /**
@@ -64,7 +90,7 @@ export function ContextChip({
    * session is not in — it would render as "Unrouted", which is what the record
    * means, not what it is. Callers holding the live list pass the object instead.
    */
-  preview?: { name: string; kind: ContextKind }
+  preview?: { name: string; color: ContextColor | null }
 }) {
   if (preview) {
     return (
@@ -74,7 +100,7 @@ export function ContextChip({
           className,
         )}
       >
-        <span className={cn("size-1.5 shrink-0 rounded-full", kindDot[preview.kind])} />
+        <span className={cn("size-1.5 shrink-0 rounded-full", dotClass(preview.color))} />
         {preview.name}
       </span>
     )
@@ -105,7 +131,7 @@ export function ContextChip({
         className,
       )}
     >
-      <span className={cn("size-1.5 shrink-0 rounded-full", kindDot[context.kind])} />
+      <span className={cn("size-1.5 shrink-0 rounded-full", dotClass(context.color))} />
       {showParent && parent ? `${parent.name} › ${context.name}` : context.name}
     </span>
   )
@@ -118,7 +144,7 @@ export function ContextRail({ contextId }: { contextId: string | null }) {
       aria-hidden
       className={cn(
         "absolute inset-y-0 left-0 w-0.5",
-        context ? kindDot[context.kind] : "bg-border",
+        context ? dotClass(context.color) : "bg-border",
       )}
     />
   )

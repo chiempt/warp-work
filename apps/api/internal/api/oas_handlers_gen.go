@@ -426,7 +426,8 @@ func (s *Server) handleCreateCommitmentRequest(args [0]string, argsEscaped bool,
 // refer to. Renaming is a change to `name`.
 //
 // A `parentId` nests the new context under an existing one, which inherits defaults from it. The tree
-// is guarded against cycles at write time; a parent that would create one is refused.
+// is guarded against cycles at write time, and capped at three levels; a parent that would breach
+// either is refused.
 //
 // POST /api/v1/contexts
 func (s *Server) handleCreateContextRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

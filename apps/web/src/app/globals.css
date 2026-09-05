@@ -39,9 +39,12 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --color-context-work: var(--context-work);
-  --color-context-study: var(--context-study);
-  --color-context-personal: var(--context-personal);
+  --color-context-slate: var(--context-slate);
+  --color-context-blue: var(--context-blue);
+  --color-context-violet: var(--context-violet);
+  --color-context-green: var(--context-green);
+  --color-context-teal: var(--context-teal);
+  --color-context-rose: var(--context-rose);
   --color-warning: var(--warning);
   --color-reliability-official: var(--reliability-official);
   --color-reliability-manual: var(--reliability-manual);
@@ -81,11 +84,19 @@
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
 
-  /* Context kinds. One hue per life area, low chroma: these tint chips and rails on a
-     surface read every morning, they are not a palette to decorate with. */
-  --context-work: oklch(0.52 0.11 248);
-  --context-study: oklch(0.52 0.1 300);
-  --context-personal: oklch(0.52 0.1 155);
+  /* Context accents. Hue names, not life areas — the tree does the grouping, so a new
+     context picks a colour without anyone having to invent a category for it. Low
+     chroma throughout: these tint chips and rails on a surface read every morning, they
+     are not a palette to decorate with.
+
+     Deliberately no amber and no saturated red. Amber is --warning and red is
+     --destructive; a context wearing either would read as a state rather than a name. */
+  --context-slate: oklch(0.52 0.02 250);
+  --context-blue: oklch(0.52 0.11 248);
+  --context-violet: oklch(0.52 0.1 300);
+  --context-green: oklch(0.52 0.1 155);
+  --context-teal: oklch(0.52 0.09 195);
+  --context-rose: oklch(0.52 0.11 15);
 
   /* Attention, not failure. Red is reserved for what is overdue, failed, or about to
      destroy something; amber is for what merely needs looking at — a source that may be
@@ -126,9 +137,12 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --context-work: oklch(0.72 0.11 248);
-  --context-study: oklch(0.74 0.1 300);
-  --context-personal: oklch(0.74 0.1 155);
+  --context-slate: oklch(0.72 0.02 250);
+  --context-blue: oklch(0.72 0.11 248);
+  --context-violet: oklch(0.74 0.1 300);
+  --context-green: oklch(0.74 0.1 155);
+  --context-teal: oklch(0.74 0.09 195);
+  --context-rose: oklch(0.72 0.11 15);
   --warning: oklch(0.78 0.13 65);
   --reliability-official: oklch(0.74 0.1 155);
   --reliability-manual: oklch(0.7 0 0);

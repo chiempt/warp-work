@@ -62,7 +62,8 @@ func (UnimplementedHandler) CreateCommitment(ctx context.Context, req *CreateCom
 // refer to. Renaming is a change to `name`.
 //
 // A `parentId` nests the new context under an existing one, which inherits defaults from it. The tree
-// is guarded against cycles at write time; a parent that would create one is refused.
+// is guarded against cycles at write time, and capped at three levels; a parent that would breach
+// either is refused.
 //
 // POST /api/v1/contexts
 func (UnimplementedHandler) CreateContext(ctx context.Context, req *CreateContextRequest) (r CreateContextRes, _ error) {

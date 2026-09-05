@@ -16,9 +16,10 @@ import (
 // The owner comes from the session, never from the request. There is one owner,
 // and which one it is is not something a caller gets to assert.
 //
-// Slug format, name length and kind are already enforced by the contract, so
-// nothing here re-checks them: a handler that repeats what the schema declares
-// has forked the contract, and the two drift the first time one is edited.
+// Slug format, name length and the colour enum are already enforced by the
+// contract, so nothing here re-checks them: a handler that repeats what the
+// schema declares has forked the contract, and the two drift the first time one
+// is edited.
 func (h *Handler) CreateContext(ctx context.Context, req *api.CreateContextRequest) (api.CreateContextRes, error) {
 	principal, ok := principalFrom(ctx)
 	if !ok {
@@ -34,9 +35,8 @@ func (h *Handler) CreateContext(ctx context.Context, req *api.CreateContextReque
 	row, err := h.contexts.Create(ctx, principal.UserID, warpcontexts.CreateParams{
 		Slug:        req.Slug,
 		Name:        req.Name,
-		Kind:        string(req.Kind),
 		ParentID:    parentID,
-		Color:       optNilString(req.Color),
+		Color:       optNilColor(req.Color),
 		ToneProfile: optString(req.ToneProfile),
 	})
 
@@ -69,7 +69,6 @@ func contextResponse(row store.Context) *api.Context {
 		ID:         row.ID,
 		Slug:       row.Slug,
 		Name:       row.Name,
-		Kind:       api.ContextKind(row.Kind),
 		Position:   row.Position,
 		IsArchived: row.IsArchived,
 		CreatedAt:  row.CreatedAt.Time.UTC(),
@@ -80,7 +79,7 @@ func contextResponse(row store.Context) *api.Context {
 		out.ParentId = api.NewOptNilUUID(*row.ParentID)
 	}
 	if row.Color != nil {
-		out.Color = api.NewOptNilString(*row.Color)
+		out.Color = api.NewOptNilContextColor(api.ContextColor(*row.Color))
 	}
 	if row.ToneProfile != nil {
 		out.ToneProfile = api.NewOptString(*row.ToneProfile)
@@ -96,10 +95,10 @@ func optString(v api.OptString) *string {
 	return &s
 }
 
-func optNilString(v api.OptNilString) *string {
+func optNilColor(v api.OptNilContextColor) *string {
 	if !v.IsSet() || v.IsNull() {
 		return nil
 	}
-	s := v.Value
+	s := string(v.Value)
 	return &s
 }

@@ -34,6 +34,7 @@ type Store interface {
 	CreateContext(ctx context.Context, arg store.CreateContextParams) (store.Context, error)
 	GetContext(ctx context.Context, id uuid.UUID) (store.Context, error)
 	NextContextPosition(ctx context.Context, userID uuid.UUID) (int32, error)
+	ListContexts(ctx context.Context, arg store.ListContextsParams) ([]store.Context, error)
 }
 
 var _ Store = (*store.Queries)(nil)
@@ -45,13 +46,13 @@ type Service struct {
 
 func NewService(st Store) *Service { return &Service{store: st} }
 
-// CreateParams is what creating a context needs. Slug, name and kind are
-// required; the schema has already rejected an empty or malformed one by the
-// time this is called.
+// CreateParams is what creating a context needs. Slug and name are required;
+// the schema has already rejected an empty or malformed one by the time this is
+// called. Colour is optional — a context without one is shown in the neutral
+// tone, which is a real choice rather than a missing value.
 type CreateParams struct {
 	Slug        string
 	Name        string
-	Kind        string
 	ParentID    *uuid.UUID
 	Color       *string
 	ToneProfile *string
@@ -64,8 +65,14 @@ type CreateParams struct {
 // belongs to the caller. Without this check an owner could nest their context
 // under somebody else's and quietly inherit its defaults.
 func (s *Service) Create(ctx context.Context, userID uuid.UUID, p CreateParams) (store.Context, error) {
-	if err := domain.ContextKind(p.Kind).Valid(); err != nil {
-		return store.Context{}, err
+	// The contract already restricts colour to the enum, and the database
+	// repeats it as contexts_color_token. Checked here too because this package
+	// is callable from the worker and from tests, neither of which goes through
+	// the generated server.
+	if p.Color != nil {
+		if err := domain.ContextColor(*p.Color).Valid(); err != nil {
+			return store.Context{}, err
+		}
 	}
 
 	if p.ParentID != nil {
@@ -97,7 +104,6 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, p CreateParams) 
 		ParentID: p.ParentID,
 		Slug:     p.Slug,
 		Name:     p.Name,
-		Kind:     store.ContextKind(p.Kind),
 		Color:    p.Color,
 		// The column defaults to '{}', meaning always active. Active hours are
 		// set by editing the context, not by guessing at creation.
@@ -123,4 +129,11 @@ func isUniqueViolation(err error, constraint string) bool {
 	return errors.As(err, &pgErr) &&
 		pgErr.Code == "23505" &&
 		pgErr.ConstraintName == constraint
+}
+
+func (s *Service) List(ctx context.Context, userID uuid.UUID, includeArchived bool) ([]store.Context, error) {
+	return s.store.ListContexts(ctx, store.ListContextsParams{
+		UserID:          userID,
+		IncludeArchived: includeArchived,
+	})
 }

@@ -2,34 +2,45 @@ package domain
 
 import "time"
 
-// ContextKind partitions the owner's life areas. The values match the CHECK
-// constraint on contexts.kind.
-type ContextKind string
+// ContextColor is the accent a context is shown in. The values match the
+// contexts_color_token CHECK constraint.
+//
+// These are hue names, not life areas, and that is the point: the tree already
+// groups — a root context called "Work" with children under it is the grouping —
+// so picking a colour must not require inventing a category first. There is no
+// fixed set of life areas the owner has to file themselves under.
+type ContextColor string
 
 const (
-	ContextWork     ContextKind = "work"
-	ContextStudy    ContextKind = "study"
-	ContextPersonal ContextKind = "personal"
+	ContextSlate  ContextColor = "slate"
+	ContextBlue   ContextColor = "blue"
+	ContextViolet ContextColor = "violet"
+	ContextGreen  ContextColor = "green"
+	ContextTeal   ContextColor = "teal"
+	ContextRose   ContextColor = "rose"
 )
 
-func (k ContextKind) Valid() error {
-	switch k {
-	case ContextWork, ContextStudy, ContextPersonal:
+// Valid reports whether the colour is one the interface has a token for. An
+// empty colour is valid and means the context is shown in the neutral tone.
+func (c ContextColor) Valid() error {
+	switch c {
+	case "", ContextSlate, ContextBlue, ContextViolet, ContextGreen, ContextTeal, ContextRose:
 		return nil
 	default:
-		return invalidf("context kind %q", string(k))
+		return invalidf("context color %q", string(c))
 	}
 }
 
 // Context is the central axis of the system. Every signal, task, person,
 // memory note, and autonomy rule belongs to one. Contexts nest: a child
-// inherits its parent's defaults unless it overrides them.
+// inherits its parent's defaults unless it overrides them. Nesting is capped at
+// three levels by the contexts_prevent_cycle trigger.
 type Context struct {
 	ID          ID
 	UserID      ID
 	ParentID    *ID
 	Name        string
-	Kind        ContextKind
+	Color       ContextColor
 	ActiveHours ActiveHours
 	ToneProfile string
 	IsArchived  bool
@@ -44,7 +55,7 @@ func (c Context) Valid() error {
 	if c.ParentID != nil && *c.ParentID == c.ID {
 		return invalidf("context %s is its own parent", c.ID)
 	}
-	return c.Kind.Valid()
+	return c.Color.Valid()
 }
 
 // ActiveHours records when a context is allowed to surface, per weekday, in the

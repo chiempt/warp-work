@@ -49,7 +49,7 @@ export function ContextsView() {
           <TableHeader>
             <TableRow>
               <TableHead>Context</TableHead>
-              <TableHead className="w-24">Kind</TableHead>
+              <TableHead className="w-24">Colour</TableHead>
               <TableHead className="w-52">Active hours</TableHead>
               <TableHead className="w-20 text-center">Sources</TableHead>
               <TableHead className="w-20 text-center">Rules</TableHead>
@@ -71,7 +71,7 @@ export function ContextsView() {
                     <div className={context.parentId ? "pl-5" : undefined}>
                       <ContextChip
                         contextId={context.id}
-                        preview={{ name: context.name, kind: context.kind }}
+                        preview={{ name: context.name, color: context.color }}
                         className="text-sm text-foreground"
                       />
                       <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
@@ -81,7 +81,7 @@ export function ContextsView() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="font-normal">
-                      {context.kind}
+                      {context.color ?? "—"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">

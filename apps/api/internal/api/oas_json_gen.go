@@ -887,10 +887,6 @@ func (s *Context) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
-		e.FieldStart("kind")
-		s.Kind.Encode(e)
-	}
-	{
 		if s.Color.Set {
 			e.FieldStart("color")
 			s.Color.Encode(e)
@@ -920,18 +916,17 @@ func (s *Context) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfContext = [11]string{
-	0:  "id",
-	1:  "parentId",
-	2:  "slug",
-	3:  "name",
-	4:  "kind",
-	5:  "color",
-	6:  "toneProfile",
-	7:  "position",
-	8:  "isArchived",
-	9:  "createdAt",
-	10: "updatedAt",
+var jsonFieldsNameOfContext = [10]string{
+	0: "id",
+	1: "parentId",
+	2: "slug",
+	3: "name",
+	4: "color",
+	5: "toneProfile",
+	6: "position",
+	7: "isArchived",
+	8: "createdAt",
+	9: "updatedAt",
 }
 
 // Decode decodes Context from json.
@@ -989,16 +984,6 @@ func (s *Context) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
-		case "kind":
-			requiredBitSet[0] |= 1 << 4
-			if err := func() error {
-				if err := s.Kind.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"kind\"")
-			}
 		case "color":
 			if err := func() error {
 				s.Color.Reset()
@@ -1020,7 +1005,7 @@ func (s *Context) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"toneProfile\"")
 			}
 		case "position":
-			requiredBitSet[0] |= 1 << 7
+			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
 				v, err := d.Int32()
 				s.Position = int32(v)
@@ -1032,7 +1017,7 @@ func (s *Context) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"position\"")
 			}
 		case "isArchived":
-			requiredBitSet[1] |= 1 << 0
+			requiredBitSet[0] |= 1 << 7
 			if err := func() error {
 				v, err := d.Bool()
 				s.IsArchived = bool(v)
@@ -1044,7 +1029,7 @@ func (s *Context) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"isArchived\"")
 			}
 		case "createdAt":
-			requiredBitSet[1] |= 1 << 1
+			requiredBitSet[1] |= 1 << 0
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
 				s.CreatedAt = v
@@ -1056,7 +1041,7 @@ func (s *Context) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"createdAt\"")
 			}
 		case "updatedAt":
-			requiredBitSet[1] |= 1 << 2
+			requiredBitSet[1] |= 1 << 1
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
 				s.UpdatedAt = v
@@ -1077,8 +1062,8 @@ func (s *Context) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
-		0b10011101,
-		0b00000111,
+		0b11001101,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -1124,44 +1109,50 @@ func (s *Context) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes ContextKind as json.
-func (s ContextKind) Encode(e *jx.Encoder) {
+// Encode encodes ContextColor as json.
+func (s ContextColor) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes ContextKind from json.
-func (s *ContextKind) Decode(d *jx.Decoder) error {
+// Decode decodes ContextColor from json.
+func (s *ContextColor) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ContextKind to nil")
+		return errors.New("invalid: unable to decode ContextColor to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch ContextKind(v) {
-	case ContextKindWork:
-		*s = ContextKindWork
-	case ContextKindStudy:
-		*s = ContextKindStudy
-	case ContextKindPersonal:
-		*s = ContextKindPersonal
+	switch ContextColor(v) {
+	case ContextColorSlate:
+		*s = ContextColorSlate
+	case ContextColorBlue:
+		*s = ContextColorBlue
+	case ContextColorViolet:
+		*s = ContextColorViolet
+	case ContextColorGreen:
+		*s = ContextColorGreen
+	case ContextColorTeal:
+		*s = ContextColorTeal
+	case ContextColorRose:
+		*s = ContextColorRose
 	default:
-		*s = ContextKind(v)
+		*s = ContextColor(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s ContextKind) MarshalJSON() ([]byte, error) {
+func (s ContextColor) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ContextKind) UnmarshalJSON(data []byte) error {
+func (s *ContextColor) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -1583,10 +1574,6 @@ func (s *CreateContextRequest) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
-		e.FieldStart("kind")
-		s.Kind.Encode(e)
-	}
-	{
 		if s.ParentId.Set {
 			e.FieldStart("parentId")
 			s.ParentId.Encode(e)
@@ -1606,13 +1593,12 @@ func (s *CreateContextRequest) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfCreateContextRequest = [6]string{
+var jsonFieldsNameOfCreateContextRequest = [5]string{
 	0: "slug",
 	1: "name",
-	2: "kind",
-	3: "parentId",
-	4: "color",
-	5: "toneProfile",
+	2: "parentId",
+	3: "color",
+	4: "toneProfile",
 }
 
 // Decode decodes CreateContextRequest from json.
@@ -1647,16 +1633,6 @@ func (s *CreateContextRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
-			}
-		case "kind":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				if err := s.Kind.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"kind\"")
 			}
 		case "parentId":
 			if err := func() error {
@@ -1698,7 +1674,7 @@ func (s *CreateContextRequest) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000111,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -3029,6 +3005,55 @@ func (s OptInt32) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptInt32) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ContextColor as json.
+func (o OptNilContextColor) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes ContextColor from json.
+func (o *OptNilContextColor) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilContextColor to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v ContextColor
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilContextColor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilContextColor) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

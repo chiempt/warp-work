@@ -26,24 +26,24 @@ $$;
 
 -- Contexts -----------------------------------------------------------------
 
-INSERT INTO contexts (user_id, parent_id, slug, name, kind, position, active_hours) VALUES
-    ((SELECT id FROM users ORDER BY created_at LIMIT 1), NULL, 'company', 'Main company',  'work',     10,
+INSERT INTO contexts (user_id, parent_id, slug, name, color, position, active_hours) VALUES
+    ((SELECT id FROM users ORDER BY created_at LIMIT 1), NULL, 'company', 'Main company',  'blue',     10,
      '{"mon":[["09:00","18:00"]],"tue":[["09:00","18:00"]],"wed":[["09:00","18:00"]],"thu":[["09:00","18:00"]],"fri":[["09:00","18:00"]]}'),
-    ((SELECT id FROM users ORDER BY created_at LIMIT 1), NULL, 'job-a',   'Remote job A',  'work',     20,
+    ((SELECT id FROM users ORDER BY created_at LIMIT 1), NULL, 'job-a',   'Remote job A',  'blue',     20,
      '{"mon":[["19:00","22:00"]],"wed":[["19:00","22:00"]],"sat":[["09:00","12:00"]]}'),
-    ((SELECT id FROM users ORDER BY created_at LIMIT 1), NULL, 'job-b',   'Remote job B',  'work',     30,
+    ((SELECT id FROM users ORDER BY created_at LIMIT 1), NULL, 'job-b',   'Remote job B',  'blue',     30,
      '{"tue":[["19:00","22:00"]],"thu":[["19:00","22:00"]],"sun":[["09:00","12:00"]]}'),
-    ((SELECT id FROM users ORDER BY created_at LIMIT 1), NULL, 'masters', 'Master''s degree', 'study', 40, '{}'),
-    ((SELECT id FROM users ORDER BY created_at LIMIT 1), NULL, 'self',    'Self',          'personal', 50, '{}')
+    ((SELECT id FROM users ORDER BY created_at LIMIT 1), NULL, 'masters', 'Master''s degree', 'violet', 40, '{}'),
+    ((SELECT id FROM users ORDER BY created_at LIMIT 1), NULL, 'self',    'Self',          'green',  50, '{}')
 ON CONFLICT (user_id, slug) DO NOTHING;
 
-INSERT INTO contexts (user_id, parent_id, slug, name, kind, position)
+INSERT INTO contexts (user_id, parent_id, slug, name, color, position)
 SELECT
     (SELECT id FROM users ORDER BY created_at LIMIT 1),
     p.id,
     child.slug,
     child.name,
-    'personal',
+    'green',
     child.position
 FROM contexts p
 CROSS JOIN (VALUES

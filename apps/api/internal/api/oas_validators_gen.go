@@ -193,13 +193,20 @@ func (s *Context) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.Kind.Validate(); err != nil {
-			return err
+		if value, ok := s.Color.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "kind",
+			Name:  "color",
 			Error: err,
 		})
 	}
@@ -209,13 +216,19 @@ func (s *Context) Validate() error {
 	return nil
 }
 
-func (s ContextKind) Validate() error {
+func (s ContextColor) Validate() error {
 	switch s {
-	case "work":
+	case "slate":
 		return nil
-	case "study":
+	case "blue":
 		return nil
-	case "personal":
+	case "violet":
+		return nil
+	case "green":
+		return nil
+	case "teal":
+		return nil
+	case "rose":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -361,33 +374,10 @@ func (s *CreateContextRequest) Validate() error {
 		})
 	}
 	if err := func() error {
-		if err := s.Kind.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "kind",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if value, ok := s.Color.Get(); ok {
 			if err := func() error {
-				if err := (validate.String{
-					MinLength:     0,
-					MinLengthSet:  false,
-					MaxLength:     32,
-					MaxLengthSet:  true,
-					Email:         false,
-					Hostname:      false,
-					Regex:         nil,
-					MinNumeric:    0,
-					MinNumericSet: false,
-					MaxNumeric:    0,
-					MaxNumericSet: false,
-				}).Validate(string(value)); err != nil {
-					return errors.Wrap(err, "string")
+				if err := value.Validate(); err != nil {
+					return err
 				}
 				return nil
 			}(); err != nil {

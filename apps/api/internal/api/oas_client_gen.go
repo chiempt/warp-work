@@ -72,7 +72,8 @@ type Invoker interface {
 	// refer to. Renaming is a change to `name`.
 	//
 	// A `parentId` nests the new context under an existing one, which inherits defaults from it. The tree
-	// is guarded against cycles at write time; a parent that would create one is refused.
+	// is guarded against cycles at write time, and capped at three levels; a parent that would breach
+	// either is refused.
 	//
 	// POST /api/v1/contexts
 	CreateContext(ctx context.Context, request *CreateContextRequest) (CreateContextRes, error)
@@ -510,7 +511,8 @@ func (c *Client) sendCreateCommitment(ctx context.Context, request *CreateCommit
 // refer to. Renaming is a change to `name`.
 //
 // A `parentId` nests the new context under an existing one, which inherits defaults from it. The tree
-// is guarded against cycles at write time; a parent that would create one is refused.
+// is guarded against cycles at write time, and capped at three levels; a parent that would breach
+// either is refused.
 //
 // POST /api/v1/contexts
 func (c *Client) CreateContext(ctx context.Context, request *CreateContextRequest) (CreateContextRes, error) {

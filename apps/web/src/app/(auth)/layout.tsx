@@ -7,7 +7,7 @@ import { redirectIfSignedIn } from "@/lib/api/session"
  * The shell both auth screens share: the product on the left, the door on the right.
  *
  * The left panel is the product's own metaphor (context doc §12) — the warp threads of a
- * loom, with seven of them lit in the context kind colours and grouped the way the
+ * loom, with seven of them lit in the context accents and grouped the way the
  * contexts nest. Nothing about it moves.
  *
  * It carries the app's dark tokens whatever the viewer's theme: the `dark` class
