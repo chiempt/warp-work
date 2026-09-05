@@ -16,6 +16,71 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
+// ArchiveContextParams is parameters of archiveContext operation.
+type ArchiveContextParams struct {
+	ContextId uuid.UUID
+}
+
+func unpackArchiveContextParams(packed middleware.Parameters) (params ArchiveContextParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "contextId",
+			In:   "path",
+		}
+		params.ContextId = packed[key].(uuid.UUID)
+	}
+	return params
+}
+
+func decodeArchiveContextParams(args [1]string, argsEscaped bool, r *http.Request) (params ArchiveContextParams, _ error) {
+	// Decode path: contextId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "contextId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToUUID(val)
+				if err != nil {
+					return err
+				}
+
+				params.ContextId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "contextId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // CompleteGoogleSignInParams is parameters of completeGoogleSignIn operation.
 type CompleteGoogleSignInParams struct {
 	Code  string
@@ -807,6 +872,71 @@ func decodeUnlinkAuthProviderParams(args [1]string, argsEscaped bool, r *http.Re
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "providerId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// UpdateContextParams is parameters of updateContext operation.
+type UpdateContextParams struct {
+	ContextId uuid.UUID
+}
+
+func unpackUpdateContextParams(packed middleware.Parameters) (params UpdateContextParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "contextId",
+			In:   "path",
+		}
+		params.ContextId = packed[key].(uuid.UUID)
+	}
+	return params
+}
+
+func decodeUpdateContextParams(args [1]string, argsEscaped bool, r *http.Request) (params UpdateContextParams, _ error) {
+	// Decode path: contextId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "contextId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToUUID(val)
+				if err != nil {
+					return err
+				}
+
+				params.ContextId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "contextId",
 			In:   "path",
 			Err:  err,
 		}

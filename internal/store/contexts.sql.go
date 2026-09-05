@@ -11,6 +11,55 @@ import (
 	"github.com/google/uuid"
 )
 
+const archiveContext = `-- name: ArchiveContext :one
+UPDATE contexts SET is_archived = true
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, parent_id, slug, name, color, active_hours, tone_profile, position, is_archived, created_at, updated_at
+`
+
+type ArchiveContextParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+// ArchiveContext is idempotent: archiving one that is already archived returns
+// the row rather than nothing, because the caller asked for a state and that
+// state holds.
+func (q *Queries) ArchiveContext(ctx context.Context, arg ArchiveContextParams) (Context, error) {
+	row := q.db.QueryRow(ctx, archiveContext, arg.ID, arg.UserID)
+	var i Context
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ParentID,
+		&i.Slug,
+		&i.Name,
+		&i.Color,
+		&i.ActiveHours,
+		&i.ToneProfile,
+		&i.Position,
+		&i.IsArchived,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const countLiveChildren = `-- name: CountLiveChildren :one
+SELECT count(*)::integer FROM contexts
+WHERE parent_id = $1 AND NOT is_archived
+`
+
+// CountLiveChildren backs the refusal to archive a parent out from under its
+// children. Counted rather than checked with EXISTS so the error can say how
+// many are in the way.
+func (q *Queries) CountLiveChildren(ctx context.Context, parentID *uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, countLiveChildren, parentID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createContext = `-- name: CreateContext :one
 INSERT INTO contexts (id, user_id, parent_id, slug, name, color, active_hours, tone_profile, position)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -86,12 +135,37 @@ func (q *Queries) GetContext(ctx context.Context, id uuid.UUID) (Context, error)
 	return i, err
 }
 
+const isDescendant = `-- name: IsDescendant :one
+SELECT EXISTS (
+    SELECT 1 FROM context_tree
+    WHERE id = $1 AND $2::uuid = ANY(ancestry)
+)::boolean
+`
+
+type IsDescendantParams struct {
+	CandidateID uuid.UUID
+	RootID      uuid.UUID
+}
+
+// IsDescendant reports whether candidate sits anywhere below root.
+//
+// Re-nesting has to refuse a move into the context's own subtree. The cycle
+// trigger would catch it too, but only as a check_violation with no way to tell
+// it apart from breaching the depth cap — and the two need different messages.
+func (q *Queries) IsDescendant(ctx context.Context, arg IsDescendantParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isDescendant, arg.CandidateID, arg.RootID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const listContexts = `-- name: ListContexts :many
-SELECT id, user_id, parent_id, slug, name, color, active_hours, tone_profile, position, is_archived, created_at, updated_at
-FROM contexts
-WHERE user_id = $1
-  AND ($2::boolean OR NOT is_archived)
-ORDER BY position, name
+SELECT c.id, c.user_id, c.parent_id, c.slug, c.name, c.color, c.active_hours, c.tone_profile, c.position, c.is_archived, c.created_at, c.updated_at
+FROM contexts c
+JOIN context_tree t ON t.id = c.id
+WHERE c.user_id = $1
+  AND ($2::boolean OR NOT c.is_archived)
+ORDER BY t.sort_path
 `
 
 type ListContextsParams struct {
@@ -99,6 +173,16 @@ type ListContextsParams struct {
 	IncludeArchived bool
 }
 
+// Parents before children, then by position — the order listContexts promises.
+//
+// Both halves come from context_tree.sort_path, which carries the (position,
+// name) of every node on the way down. Ordering by contexts.position alone gets
+// the second half and loses the first: positions are handed out per owner, not
+// per branch, so a child created early sorts above its own parent.
+//
+// The filter is on the row's own is_archived, so a live child of an archived
+// parent still appears. It has not been archived, and hiding it would make it
+// unreachable without saying so.
 func (q *Queries) ListContexts(ctx context.Context, arg ListContextsParams) ([]Context, error) {
 	rows, err := q.db.Query(ctx, listContexts, arg.UserID, arg.IncludeArchived)
 	if err != nil {
@@ -140,10 +224,77 @@ SELECT COALESCE(MAX(position) + 1, 0)::integer FROM contexts WHERE user_id = $1
 //
 // Read separately rather than computed inside the insert so the insert stays a
 // plain statement sqlc can type. A race here costs nothing: two contexts would
-// share a position, and ListContexts breaks that tie by name.
+// share a position, and context_tree.sort_path breaks that tie by name.
 func (q *Queries) NextContextPosition(ctx context.Context, userID uuid.UUID) (int32, error) {
 	row := q.db.QueryRow(ctx, nextContextPosition, userID)
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const updateContext = `-- name: UpdateContext :one
+UPDATE contexts
+SET
+    name         = COALESCE($1, name),
+    is_archived  = COALESCE($2, is_archived),
+    color        = CASE WHEN $3::boolean
+                        THEN $4::text ELSE color END,
+    parent_id    = CASE WHEN $5::boolean
+                        THEN $6::uuid ELSE parent_id END,
+    tone_profile = CASE WHEN $7::boolean
+                        THEN $8::text ELSE tone_profile END
+WHERE id = $9 AND user_id = $10
+RETURNING id, user_id, parent_id, slug, name, color, active_hours, tone_profile, position, is_archived, created_at, updated_at
+`
+
+type UpdateContextParams struct {
+	Name           *string
+	IsArchived     *bool
+	SetColor       bool
+	Color          *string
+	SetParentID    bool
+	ParentID       *uuid.UUID
+	SetToneProfile bool
+	ToneProfile    *string
+	ID             uuid.UUID
+	UserID         uuid.UUID
+}
+
+// UpdateContext applies a partial change.
+//
+// Each nullable column takes a pair: the value, and a boolean saying whether
+// this request mentioned it at all. COALESCE cannot express that difference —
+// it reads an explicit null as "unchanged", which would make clearing a colour
+// or promoting a context to the top level impossible.
+//
+// slug is absent on purpose: it is immutable.
+func (q *Queries) UpdateContext(ctx context.Context, arg UpdateContextParams) (Context, error) {
+	row := q.db.QueryRow(ctx, updateContext,
+		arg.Name,
+		arg.IsArchived,
+		arg.SetColor,
+		arg.Color,
+		arg.SetParentID,
+		arg.ParentID,
+		arg.SetToneProfile,
+		arg.ToneProfile,
+		arg.ID,
+		arg.UserID,
+	)
+	var i Context
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ParentID,
+		&i.Slug,
+		&i.Name,
+		&i.Color,
+		&i.ActiveHours,
+		&i.ToneProfile,
+		&i.Position,
+		&i.IsArchived,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

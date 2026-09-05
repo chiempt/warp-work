@@ -17,13 +17,16 @@ var (
 	rn17AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
-	rn3AllowedHeaders = map[string]string{
-		"POST": "Content-Type",
-	}
-	rn5AllowedHeaders = map[string]string{
-		"POST": "Content-Type",
-	}
 	rn6AllowedHeaders = map[string]string{
+		"POST": "Content-Type",
+	}
+	rn7AllowedHeaders = map[string]string{
+		"POST": "Content-Type",
+	}
+	rn2AllowedHeaders = map[string]string{
+		"PATCH": "Content-Type",
+	}
+	rn8AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
 )
@@ -426,7 +429,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "POST",
-								allowedHeaders: rn3AllowedHeaders,
+								allowedHeaders: rn6AllowedHeaders,
 								acceptPost:     "application/json",
 								acceptPatch:    "",
 							})
@@ -452,7 +455,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "GET,POST",
-								allowedHeaders: rn5AllowedHeaders,
+								allowedHeaders: rn7AllowedHeaders,
 								acceptPost:     "application/json",
 								acceptPatch:    "",
 							})
@@ -481,16 +484,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						if len(elem) == 0 {
 							// Leaf node.
 							switch r.Method {
+							case "DELETE":
+								s.handleArchiveContextRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
 							case "GET":
 								s.handleGetContextRequest([1]string{
 									args[0],
 								}, elemIsEscaped, w, r)
+							case "PATCH":
+								s.handleUpdateContextRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
 							default:
 								s.notAllowed(w, r, notAllowedParams{
-									allowedMethods: "GET",
-									allowedHeaders: nil,
+									allowedMethods: "DELETE,GET,PATCH",
+									allowedHeaders: rn2AllowedHeaders,
 									acceptPost:     "",
-									acceptPatch:    "",
+									acceptPatch:    "application/json",
 								})
 							}
 
@@ -542,7 +553,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					default:
 						s.notAllowed(w, r, notAllowedParams{
 							allowedMethods: "POST",
-							allowedHeaders: rn6AllowedHeaders,
+							allowedHeaders: rn8AllowedHeaders,
 							acceptPost:     "application/json",
 							acceptPatch:    "",
 						})
@@ -1063,10 +1074,28 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						if len(elem) == 0 {
 							// Leaf node.
 							switch method {
+							case "DELETE":
+								r.name = ArchiveContextOperation
+								r.summary = "Archive a context"
+								r.operationID = "archiveContext"
+								r.operationGroup = ""
+								r.pathPattern = "/api/v1/contexts/{contextId}"
+								r.args = args
+								r.count = 1
+								return r, true
 							case "GET":
 								r.name = GetContextOperation
 								r.summary = "Get one context"
 								r.operationID = "getContext"
+								r.operationGroup = ""
+								r.pathPattern = "/api/v1/contexts/{contextId}"
+								r.args = args
+								r.count = 1
+								return r, true
+							case "PATCH":
+								r.name = UpdateContextOperation
+								r.summary = "Change a context"
+								r.operationID = "updateContext"
 								r.operationGroup = ""
 								r.pathPattern = "/api/v1/contexts/{contextId}"
 								r.args = args

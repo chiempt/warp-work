@@ -6,6 +6,7 @@ package api
 type OperationName = string
 
 const (
+	ArchiveContextOperation       OperationName = "ArchiveContext"
 	CompleteGoogleSignInOperation OperationName = "CompleteGoogleSignIn"
 	CreateCommitmentOperation     OperationName = "CreateCommitment"
 	CreateContextOperation        OperationName = "CreateContext"
@@ -23,4 +24,5 @@ const (
 	SignOutOperation              OperationName = "SignOut"
 	StartGoogleSignInOperation    OperationName = "StartGoogleSignIn"
 	UnlinkAuthProviderOperation   OperationName = "UnlinkAuthProvider"
+	UpdateContextOperation        OperationName = "UpdateContext"
 )

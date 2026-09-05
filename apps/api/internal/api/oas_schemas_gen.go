@@ -162,6 +162,23 @@ func (s *AccountStatus) UnmarshalText(data []byte) error {
 	}
 }
 
+type ArchiveContextConflict ErrorEnvelope
+
+func (*ArchiveContextConflict) archiveContextRes() {}
+
+// ArchiveContextNoContent is response for ArchiveContext operation.
+type ArchiveContextNoContent struct{}
+
+func (*ArchiveContextNoContent) archiveContextRes() {}
+
+type ArchiveContextNotFound ErrorEnvelope
+
+func (*ArchiveContextNotFound) archiveContextRes() {}
+
+type ArchiveContextUnauthorized ErrorEnvelope
+
+func (*ArchiveContextUnauthorized) archiveContextRes() {}
+
 // What decided this signal's placement, so a misfiling can be traced.
 // Ref: #/components/schemas/AssignedBy
 type AssignedBy string
@@ -710,6 +727,7 @@ func (s *Context) SetUpdatedAt(val time.Time) {
 
 func (*Context) createContextRes() {}
 func (*Context) getContextRes()    {}
+func (*Context) updateContextRes() {}
 
 // The accent a context is shown in. Hue names, not life areas: the tree already groups, so choosing a
 // colour must not require choosing a category first.
@@ -3029,3 +3047,80 @@ func (*UnlinkAuthProviderNotFound) unlinkAuthProviderRes() {}
 type UnlinkAuthProviderUnauthorized ErrorEnvelope
 
 func (*UnlinkAuthProviderUnauthorized) unlinkAuthProviderRes() {}
+
+type UpdateContextNotFound ErrorEnvelope
+
+func (*UpdateContextNotFound) updateContextRes() {}
+
+// A partial update. An absent property is left alone; an explicit null on a nullable property clears
+// it. `slug` is absent by design — it is immutable.
+// Ref: #/components/schemas/UpdateContextRequest
+type UpdateContextRequest struct {
+	Name OptString `json:"name"`
+	// Null promotes the context to the top level. A parent that is the context itself, one of its
+	// descendants, or that would push the tree past three levels is refused.
+	ParentId    OptNilUUID         `json:"parentId"`
+	Color       OptNilContextColor `json:"color"`
+	ToneProfile OptNilString       `json:"toneProfile"`
+	// False restores an archived context. True archives it, the same as `DELETE`, and is refused on the
+	// same terms.
+	IsArchived OptBool `json:"isArchived"`
+}
+
+// GetName returns the value of Name.
+func (s *UpdateContextRequest) GetName() OptString {
+	return s.Name
+}
+
+// GetParentId returns the value of ParentId.
+func (s *UpdateContextRequest) GetParentId() OptNilUUID {
+	return s.ParentId
+}
+
+// GetColor returns the value of Color.
+func (s *UpdateContextRequest) GetColor() OptNilContextColor {
+	return s.Color
+}
+
+// GetToneProfile returns the value of ToneProfile.
+func (s *UpdateContextRequest) GetToneProfile() OptNilString {
+	return s.ToneProfile
+}
+
+// GetIsArchived returns the value of IsArchived.
+func (s *UpdateContextRequest) GetIsArchived() OptBool {
+	return s.IsArchived
+}
+
+// SetName sets the value of Name.
+func (s *UpdateContextRequest) SetName(val OptString) {
+	s.Name = val
+}
+
+// SetParentId sets the value of ParentId.
+func (s *UpdateContextRequest) SetParentId(val OptNilUUID) {
+	s.ParentId = val
+}
+
+// SetColor sets the value of Color.
+func (s *UpdateContextRequest) SetColor(val OptNilContextColor) {
+	s.Color = val
+}
+
+// SetToneProfile sets the value of ToneProfile.
+func (s *UpdateContextRequest) SetToneProfile(val OptNilString) {
+	s.ToneProfile = val
+}
+
+// SetIsArchived sets the value of IsArchived.
+func (s *UpdateContextRequest) SetIsArchived(val OptBool) {
+	s.IsArchived = val
+}
+
+type UpdateContextUnauthorized ErrorEnvelope
+
+func (*UpdateContextUnauthorized) updateContextRes() {}
+
+type UpdateContextUnprocessableEntity ErrorEnvelope
+
+func (*UpdateContextUnprocessableEntity) updateContextRes() {}

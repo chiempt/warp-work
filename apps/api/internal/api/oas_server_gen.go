@@ -8,6 +8,22 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// ArchiveContext implements archiveContext operation.
+	//
+	// Archives it. Nothing is deleted, and this endpoint is the reason there is no operation that deletes
+	// one: `signals`, `tasks`, `events`, `commitments`, `metrics` and `memory_notes` all reference
+	// `contexts` with `ON DELETE CASCADE`, so removing a row would take a life area's entire history with
+	// it. A life area ending does not make what happened in it untrue.
+	//
+	// Archiving is idempotent — archiving an already archived context answers 204. Restoring one is
+	// `PATCH` with `isArchived` false.
+	//
+	// A context with children that are still live is refused: archiving a parent while its children stay
+	// in the tree leaves them pointing at something the owner has put away. Archive the children first, or
+	// move them elsewhere.
+	//
+	// DELETE /api/v1/contexts/{contextId}
+	ArchiveContext(ctx context.Context, params ArchiveContextParams) (ArchiveContextRes, error)
 	// CompleteGoogleSignIn implements completeGoogleSignIn operation.
 	//
 	// Where Google returns the browser. Verifies `state` against the cookie, exchanges `code`, and matches
@@ -171,6 +187,20 @@ type Handler interface {
 	//
 	// DELETE /api/v1/auth/providers/{providerId}
 	UnlinkAuthProvider(ctx context.Context, params UnlinkAuthProviderParams) (UnlinkAuthProviderRes, error)
+	// UpdateContext implements updateContext operation.
+	//
+	// Every field is optional; an absent one is left alone. `color`, `parentId` and `toneProfile` are
+	// nullable, and sending an explicit null clears them — for `parentId` that means promoting the
+	// context to the top level.
+	//
+	// `slug` cannot be changed. It is what routing rules and saved links point at, so renaming is a change
+	// to `name` and nothing else moves.
+	//
+	// Re-nesting is checked the same way creating is: the parent must belong to the caller, must not be
+	// the context itself or one of its descendants, and must not push the tree past three levels.
+	//
+	// PATCH /api/v1/contexts/{contextId}
+	UpdateContext(ctx context.Context, req *UpdateContextRequest, params UpdateContextParams) (UpdateContextRes, error)
 	// NewError creates *ErrorStatusCode from error returned by handler.
 	//
 	// Used for common default response.

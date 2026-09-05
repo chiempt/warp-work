@@ -29,6 +29,22 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
+	// ArchiveContext invokes archiveContext operation.
+	//
+	// Archives it. Nothing is deleted, and this endpoint is the reason there is no operation that deletes
+	// one: `signals`, `tasks`, `events`, `commitments`, `metrics` and `memory_notes` all reference
+	// `contexts` with `ON DELETE CASCADE`, so removing a row would take a life area's entire history with
+	// it. A life area ending does not make what happened in it untrue.
+	//
+	// Archiving is idempotent — archiving an already archived context answers 204. Restoring one is
+	// `PATCH` with `isArchived` false.
+	//
+	// A context with children that are still live is refused: archiving a parent while its children stay
+	// in the tree leaves them pointing at something the owner has put away. Archive the children first, or
+	// move them elsewhere.
+	//
+	// DELETE /api/v1/contexts/{contextId}
+	ArchiveContext(ctx context.Context, params ArchiveContextParams) (ArchiveContextRes, error)
 	// CompleteGoogleSignIn invokes completeGoogleSignIn operation.
 	//
 	// Where Google returns the browser. Verifies `state` against the cookie, exchanges `code`, and matches
@@ -192,6 +208,20 @@ type Invoker interface {
 	//
 	// DELETE /api/v1/auth/providers/{providerId}
 	UnlinkAuthProvider(ctx context.Context, params UnlinkAuthProviderParams) (UnlinkAuthProviderRes, error)
+	// UpdateContext invokes updateContext operation.
+	//
+	// Every field is optional; an absent one is left alone. `color`, `parentId` and `toneProfile` are
+	// nullable, and sending an explicit null clears them — for `parentId` that means promoting the
+	// context to the top level.
+	//
+	// `slug` cannot be changed. It is what routing rules and saved links point at, so renaming is a change
+	// to `name` and nothing else moves.
+	//
+	// Re-nesting is checked the same way creating is: the parent must belong to the caller, must not be
+	// the context itself or one of its descendants, and must not push the tree past three levels.
+	//
+	// PATCH /api/v1/contexts/{contextId}
+	UpdateContext(ctx context.Context, request *UpdateContextRequest, params UpdateContextParams) (UpdateContextRes, error)
 }
 
 // Client implements OAS client.
@@ -233,6 +263,147 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 		return c.serverURL
 	}
 	return u
+}
+
+// ArchiveContext invokes archiveContext operation.
+//
+// Archives it. Nothing is deleted, and this endpoint is the reason there is no operation that deletes
+// one: `signals`, `tasks`, `events`, `commitments`, `metrics` and `memory_notes` all reference
+// `contexts` with `ON DELETE CASCADE`, so removing a row would take a life area's entire history with
+// it. A life area ending does not make what happened in it untrue.
+//
+// Archiving is idempotent — archiving an already archived context answers 204. Restoring one is
+// `PATCH` with `isArchived` false.
+//
+// A context with children that are still live is refused: archiving a parent while its children stay
+// in the tree leaves them pointing at something the owner has put away. Archive the children first, or
+// move them elsewhere.
+//
+// DELETE /api/v1/contexts/{contextId}
+func (c *Client) ArchiveContext(ctx context.Context, params ArchiveContextParams) (ArchiveContextRes, error) {
+	res, err := c.sendArchiveContext(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendArchiveContext(ctx context.Context, params ArchiveContextParams) (res ArchiveContextRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("archiveContext"),
+		semconv.HTTPRequestMethodKey.String("DELETE"),
+		semconv.URLTemplateKey.String("/api/v1/contexts/{contextId}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ArchiveContextOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/api/v1/contexts/"
+	{
+		// Encode "contextId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "contextId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.UUIDToString(params.ContextId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "DELETE", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ArchiveContextOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeArchiveContextResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
 }
 
 // CompleteGoogleSignIn invokes completeGoogleSignIn operation.
@@ -2320,6 +2491,148 @@ func (c *Client) sendUnlinkAuthProvider(ctx context.Context, params UnlinkAuthPr
 
 	stage = "DecodeResponse"
 	result, err := decodeUnlinkAuthProviderResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// UpdateContext invokes updateContext operation.
+//
+// Every field is optional; an absent one is left alone. `color`, `parentId` and `toneProfile` are
+// nullable, and sending an explicit null clears them — for `parentId` that means promoting the
+// context to the top level.
+//
+// `slug` cannot be changed. It is what routing rules and saved links point at, so renaming is a change
+// to `name` and nothing else moves.
+//
+// Re-nesting is checked the same way creating is: the parent must belong to the caller, must not be
+// the context itself or one of its descendants, and must not push the tree past three levels.
+//
+// PATCH /api/v1/contexts/{contextId}
+func (c *Client) UpdateContext(ctx context.Context, request *UpdateContextRequest, params UpdateContextParams) (UpdateContextRes, error) {
+	res, err := c.sendUpdateContext(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendUpdateContext(ctx context.Context, request *UpdateContextRequest, params UpdateContextParams) (res UpdateContextRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("updateContext"),
+		semconv.HTTPRequestMethodKey.String("PATCH"),
+		semconv.URLTemplateKey.String("/api/v1/contexts/{contextId}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, UpdateContextOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/api/v1/contexts/"
+	{
+		// Encode "contextId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "contextId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.UUIDToString(params.ContextId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "PATCH", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeUpdateContextRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, UpdateContextOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeUpdateContextResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

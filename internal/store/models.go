@@ -1315,6 +1315,7 @@ type ContextTree struct {
 	Path     string
 	Depth    int32
 	Ancestry interface{}
+	SortPath interface{}
 }
 
 type Event struct {

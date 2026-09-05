@@ -12,9 +12,17 @@ import (
 )
 
 type Querier interface {
+	// ArchiveContext is idempotent: archiving one that is already archived returns
+	// the row rather than nothing, because the caller asked for a state and that
+	// state holds.
+	ArchiveContext(ctx context.Context, arg ArchiveContextParams) (Context, error)
 	AssignSignalContext(ctx context.Context, arg AssignSignalContextParams) error
 	ClearFailedLogins(ctx context.Context, authProviderID uuid.UUID) error
 	CountAuthProviders(ctx context.Context, userID uuid.UUID) (int64, error)
+	// CountLiveChildren backs the refusal to archive a parent out from under its
+	// children. Counted rather than checked with EXISTS so the error can say how
+	// many are in the way.
+	CountLiveChildren(ctx context.Context, parentID *uuid.UUID) (int32, error)
 	CreateAuthPassword(ctx context.Context, arg CreateAuthPasswordParams) error
 	CreateAuthProvider(ctx context.Context, arg CreateAuthProviderParams) (AuthProvider, error)
 	CreateAuthSession(ctx context.Context, arg CreateAuthSessionParams) (AuthSession, error)
@@ -49,6 +57,12 @@ type Querier interface {
 	// the stored rows untouched rather than writing new ones — signals are
 	// immutable, and a database trigger enforces that too.
 	IngestSignal(ctx context.Context, arg IngestSignalParams) (Signal, error)
+	// IsDescendant reports whether candidate sits anywhere below root.
+	//
+	// Re-nesting has to refuse a move into the context's own subtree. The cycle
+	// trigger would catch it too, but only as a check_violation with no way to tell
+	// it apart from breaching the depth cap — and the two need different messages.
+	IsDescendant(ctx context.Context, arg IsDescendantParams) (bool, error)
 	// ListAccountsDueForSync drives the worker. Never synced comes first.
 	ListAccountsDueForSync(ctx context.Context, arg ListAccountsDueForSyncParams) ([]Account, error)
 	ListAccountsForContexts(ctx context.Context, contextIds []uuid.UUID) ([]Account, error)
@@ -57,6 +71,16 @@ type Querier interface {
 	// ListContextTimeline is the read path behind the timeline view. It is
 	// context-scoped by construction: there is no unfiltered signal listing.
 	ListContextTimeline(ctx context.Context, arg ListContextTimelineParams) ([]ListContextTimelineRow, error)
+	// Parents before children, then by position — the order listContexts promises.
+	//
+	// Both halves come from context_tree.sort_path, which carries the (position,
+	// name) of every node on the way down. Ordering by contexts.position alone gets
+	// the second half and loses the first: positions are handed out per owner, not
+	// per branch, so a child created early sorts above its own parent.
+	//
+	// The filter is on the row's own is_archived, so a live child of an archived
+	// parent still appears. It has not been archived, and hiding it would make it
+	// unreachable without saying so.
 	ListContexts(ctx context.Context, arg ListContextsParams) ([]Context, error)
 	// ListLiveSessions is what makes a lost laptop revocable: it exists so the
 	// owner can see where they are signed in and end one of them.
@@ -95,7 +119,7 @@ type Querier interface {
 	//
 	// Read separately rather than computed inside the insert so the insert stays a
 	// plain statement sqlc can type. A race here costs nothing: two contexts would
-	// share a position, and ListContexts breaks that tie by name.
+	// share a position, and context_tree.sort_path breaks that tie by name.
 	NextContextPosition(ctx context.Context, userID uuid.UUID) (int32, error)
 	// NextTaskPosition places a new task after the ones that exist.
 	//
@@ -121,6 +145,15 @@ type Querier interface {
 	// "when did I sign out" stays answerable for a while.
 	SweepExpiredSessions(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error)
 	TouchAuthSession(ctx context.Context, arg TouchAuthSessionParams) error
+	// UpdateContext applies a partial change.
+	//
+	// Each nullable column takes a pair: the value, and a boolean saying whether
+	// this request mentioned it at all. COALESCE cannot express that difference —
+	// it reads an explicit null as "unchanged", which would make clearing a colour
+	// or promoting a context to the top level impossible.
+	//
+	// slug is absent on purpose: it is immutable.
+	UpdateContext(ctx context.Context, arg UpdateContextParams) (Context, error)
 	// UpdatePasswordHash re-hashes at the current cost. A successful sign-in is the
 	// only moment the plaintext is available to do it with.
 	UpdatePasswordHash(ctx context.Context, arg UpdatePasswordHashParams) error

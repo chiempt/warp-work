@@ -448,6 +448,83 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+    patch:
+      operationId: updateContext
+      tags: [contexts]
+      summary: Change a context
+      description: |
+        Every field is optional; an absent one is left alone. `color`,
+        `parentId` and `toneProfile` are nullable, and sending an explicit null
+        clears them — for `parentId` that means promoting the context to the top
+        level.
+
+        `slug` cannot be changed. It is what routing rules and saved links point
+        at, so renaming is a change to `name` and nothing else moves.
+
+        Re-nesting is checked the same way creating is: the parent must belong to
+        the caller, must not be the context itself or one of its descendants, and
+        must not push the tree past three levels.
+      parameters:
+        - $ref: "#/components/parameters/ContextId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContextRequest"
+      responses:
+        "200":
+          description: The context as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Context"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        default:
+          $ref: "#/components/responses/Error"
+
+    delete:
+      operationId: archiveContext
+      tags: [contexts]
+      summary: Archive a context
+      description: |
+        Archives it. Nothing is deleted, and this endpoint is the reason there is
+        no operation that deletes one: `signals`, `tasks`, `events`,
+        `commitments`, `metrics` and `memory_notes` all reference `contexts` with
+        `ON DELETE CASCADE`, so removing a row would take a life area's entire
+        history with it. A life area ending does not make what happened in it
+        untrue.
+
+        Archiving is idempotent — archiving an already archived context answers
+        204. Restoring one is `PATCH` with `isArchived` false.
+
+        A context with children that are still live is refused: archiving a
+        parent while its children stay in the tree leaves them pointing at
+        something the owner has put away. Archive the children first, or move
+        them elsewhere.
+      parameters:
+        - $ref: "#/components/parameters/ContextId"
+      responses:
+        "204":
+          description: Archived.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Children are still live.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          $ref: "#/components/responses/Error"
+
   /api/v1/accounts:
     get:
       operationId: listAccounts
@@ -949,6 +1026,39 @@ components:
           description: |
             How the system writes on the owner's behalf here. It never leaks
             into another context.
+
+    UpdateContextRequest:
+      type: object
+      description: |
+        A partial update. An absent property is left alone; an explicit null on a
+        nullable property clears it. `slug` is absent by design — it is immutable.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Remote job A
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Null promotes the context to the top level. A parent that is the
+            context itself, one of its descendants, or that would push the tree
+            past three levels is refused.
+        color:
+          allOf:
+            - $ref: "#/components/schemas/ContextColor"
+          nullable: true
+        toneProfile:
+          type: string
+          maxLength: 2000
+          nullable: true
+        isArchived:
+          type: boolean
+          description: |
+            False restores an archived context. True archives it, the same as
+            `DELETE`, and is refused on the same terms.
 
     ContextList:
       type: object
